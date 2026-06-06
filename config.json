@@ -1,0 +1,151 @@
+{
+  "rewards": {
+    "Grito XD": {
+      "videos": [
+        "videos/EhriGime.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "FRACASADO": {
+      "videos": [
+        "videos/SoyUnFracasado.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "KEKE": {
+      "videos": [
+        "videos/KEKE.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "ADVINCULA": {
+      "videos": [
+        "videos/ADVINCULA.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "XD": {
+      "videos": [
+        "videos/XD.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "MMM": {
+      "videos": [
+        "videos/MMM.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "DED": {
+      "videos": [
+        "videos/DED.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "TROSTE": {
+      "videos": [
+        "videos/TROSTE.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "DATO": {
+      "videos": [
+        "videos/BUENDATO.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "ME ASUSTE": {
+      "videos": [
+        "videos/AMEASUSTE.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "CALLATE": {
+      "videos": [
+        "videos/CALLATE.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "BANEADO": {
+      "videos": [
+        "videos/BANEADO.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "MIAU": {
+      "videos": [
+        "videos/MIAU.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.3,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    },
+    "GRASA": {
+      "videos": [
+        "videos/GRASA.mp4"
+      ],
+      "width": 480,
+      "height": 270,
+      "volume": 0.8,
+      "maxDuration": 10000,
+      "respectSafeZones": true
+    }
+  },
+  "safeZones": {
+    "exclude": []
+  },
+  "canvas": {
+    "width": 1920,
+    "height": 1080
+  }
+}

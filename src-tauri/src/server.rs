@@ -1,0 +1,234 @@
+use crate::AppState;
+use axum::{
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Query, State,
+    },
+    http::{header, StatusCode},
+    response::{Html, IntoResponse, Response},
+    routing::get,
+    Json, Router,
+};
+use futures_util::{SinkExt, StreamExt};
+use serde::Deserialize;
+use serde_json::json;
+use tower_http::{cors::CorsLayer, services::ServeDir};
+
+const SERVER_BIND: &str = "127.0.0.1:3001";
+
+static OVERLAY_HTML: &str = include_str!("../../src/overlay.html");
+
+pub async fn start(state: AppState) -> std::io::Result<()> {
+    let videos_dir = state.data_dir.join("videos");
+
+    let app = Router::new()
+        .route("/", get(root_handler))
+        .route("/overlay", get(serve_overlay))
+        .route("/config.json", get(serve_config_json))
+        .route("/api/config", get(get_config_handler).post(post_config_handler))
+        .route("/api/videos", get(list_videos_handler))
+        .route("/api/trigger", get(trigger_get).post(trigger_post))
+        .nest_service("/videos", ServeDir::new(videos_dir))
+        .layer(CorsLayer::permissive())
+        .with_state(state);
+
+    let listener = tokio::net::TcpListener::bind(SERVER_BIND).await?;
+    println!("[Server] Listening on http://{}", SERVER_BIND);
+    println!("[Server] Overlay (OBS) → http://{}/overlay", SERVER_BIND);
+    println!("[Server] Trigger (S.bot) → http://{}/api/trigger", SERVER_BIND);
+
+    axum::serve(listener, app)
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    Ok(())
+}
+
+// ── Root: WS upgrade for overlay, status page for browsers ───────────────────
+
+async fn root_handler(State(state): State<AppState>, ws: Option<WebSocketUpgrade>) -> Response {
+    match ws {
+        Some(upgrade) => {
+            let tx = state.tx.clone();
+            upgrade.on_upgrade(move |socket| handle_ws(socket, tx))
+        }
+        None => Html(
+            r#"<!doctype html><meta charset="utf-8"><title>Stream Overlay</title>
+            <body style="background:#0e0e10;color:#efeff1;font-family:system-ui;padding:40px">
+            <h1>Stream Overlay</h1>
+            <p>El servidor está corriendo. Endpoints:</p>
+            <ul>
+              <li><a href="/overlay" style="color:#9147ff">/overlay</a> — pegar en OBS Browser Source</li>
+              <li><code>/api/trigger?reward=NAME&amp;user=NAME</code> — Streamer.bot</li>
+            </ul>
+            <p>El panel de control está en la ventana principal de la app.</p>
+            </body>"#,
+        )
+        .into_response(),
+    }
+}
+
+async fn handle_ws(socket: WebSocket, tx: tokio::sync::broadcast::Sender<String>) {
+    let (mut sink, mut stream) = socket.split();
+    let mut rx = tx.subscribe();
+
+    // Send Connected event (matches original protocol)
+    let hello = json!({
+        "event": { "source": "System", "type": "Connected" },
+        "data": { "clients": tx.receiver_count() }
+    })
+    .to_string();
+    let _ = sink.send(Message::Text(hello)).await;
+    println!("[WS] Overlay conectado. Total: {}", tx.receiver_count());
+
+    // Reader: drain incoming messages (overlay doesn't send anything meaningful)
+    let read = tokio::spawn(async move {
+        while let Some(msg) = stream.next().await {
+            if msg.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Writer: forward broadcast messages
+    let write = tokio::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            if sink.send(Message::Text(msg)).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    tokio::select! {
+        _ = read => {}
+        _ = write => {}
+    }
+    println!("[WS] Overlay desconectado. Total: {}", tx.receiver_count().saturating_sub(1));
+}
+
+// ── /overlay ────────────────────────────────────────────────────────────────
+
+async fn serve_overlay() -> impl IntoResponse {
+    Html(OVERLAY_HTML)
+}
+
+// ── /config.json (overlay fetches this) ─────────────────────────────────────
+
+async fn serve_config_json(State(state): State<AppState>) -> Response {
+    match std::fs::read_to_string(state.data_dir.join("config.json")) {
+        Ok(s) => ([(header::CONTENT_TYPE, "application/json")], s).into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            [(header::CONTENT_TYPE, "application/json")],
+            "{}",
+        )
+            .into_response(),
+    }
+}
+
+// ── /api/config (admin UI — kept HTTP for compat / external tools) ──────────
+
+async fn get_config_handler(State(state): State<AppState>) -> Response {
+    let path = state.data_dir.join("config.json");
+    let value: serde_json::Value = match std::fs::read_to_string(&path) {
+        Ok(s) => serde_json::from_str(&s).unwrap_or_else(|_| json!({
+            "rewards": {},
+            "safeZones": { "exclude": [] },
+            "canvas": { "width": 1920, "height": 1080 }
+        })),
+        Err(_) => json!({
+            "rewards": {},
+            "safeZones": { "exclude": [] },
+            "canvas": { "width": 1920, "height": 1080 }
+        }),
+    };
+    Json(value).into_response()
+}
+
+async fn post_config_handler(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let pretty = match serde_json::to_string_pretty(&body) {
+        Ok(s) => s,
+        Err(e) => {
+            return (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() })))
+                .into_response();
+        }
+    };
+    match std::fs::write(state.data_dir.join("config.json"), pretty) {
+        Ok(_) => Json(json!({ "ok": true })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+// ── /api/videos ─────────────────────────────────────────────────────────────
+
+async fn list_videos_handler(State(state): State<AppState>) -> Response {
+    let dir = state.data_dir.join("videos");
+    let mut files: Vec<String> = vec![];
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            if let Some(name) = entry.file_name().to_str() {
+                let lower = name.to_ascii_lowercase();
+                if lower.ends_with(".mp4") || lower.ends_with(".webm") || lower.ends_with(".mov") {
+                    files.push(name.to_string());
+                }
+            }
+        }
+    }
+    files.sort();
+    Json(files).into_response()
+}
+
+// ── /api/trigger ────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct TriggerParams {
+    reward: Option<String>,
+    user: Option<String>,
+}
+
+async fn trigger_get(
+    State(state): State<AppState>,
+    Query(params): Query<TriggerParams>,
+) -> Response {
+    handle_trigger(&state, params.reward, params.user)
+}
+
+async fn trigger_post(
+    State(state): State<AppState>,
+    body: Option<Json<TriggerParams>>,
+) -> Response {
+    let (r, u) = match body {
+        Some(Json(p)) => (p.reward, p.user),
+        None => (None, None),
+    };
+    handle_trigger(&state, r, u)
+}
+
+fn handle_trigger(state: &AppState, reward: Option<String>, user: Option<String>) -> Response {
+    let reward = match reward.filter(|r| !r.is_empty()) {
+        Some(r) => r,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "missing reward" })),
+            )
+                .into_response();
+        }
+    };
+    let user = user.unwrap_or_default();
+    let msg = json!({
+        "event": { "source": "General", "type": "Custom" },
+        "data": { "action": "playVideo", "reward": reward, "user": user }
+    })
+    .to_string();
+    let clients = state.tx.send(msg).unwrap_or(0);
+    println!("[Trigger] playVideo → {} | clientes: {}", reward, clients);
+    Json(json!({ "ok": true, "clients": clients })).into_response()
+}
+

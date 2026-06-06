@@ -1,0 +1,14 @@
+videos/
+node_modules/
+*.mp4
+*.webm
+*.mov
+*.mkv
+
+# Rust / Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
+src-tauri/Cargo.lock
+
+# Build logs
+*.log
