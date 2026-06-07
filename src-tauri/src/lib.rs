@@ -20,28 +20,31 @@ fn default_config() -> Value {
 }
 
 fn find_data_dir() -> PathBuf {
-    // Priority: cwd → exe parent → cwd parent (dev case: cwd = src-tauri)
-    let mut candidates: Vec<PathBuf> = vec![];
+    // Search for config.json by walking up the ancestors of both the current
+    // working directory and the executable's directory. This covers `tauri dev`
+    // (cwd = src-tauri) as well as running the built exe directly, where the
+    // binary lives several levels deep under src-tauri/target/<profile>/.
+    let mut roots: Vec<PathBuf> = vec![];
     if let Ok(cwd) = std::env::current_dir() {
-        candidates.push(cwd.clone());
-        if let Some(parent) = cwd.parent() {
-            candidates.push(parent.to_path_buf());
-        }
+        roots.push(cwd);
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
-            candidates.push(parent.to_path_buf());
+            roots.push(parent.to_path_buf());
         }
     }
-    for cand in &candidates {
-        if cand.join("config.json").exists() {
-            println!("[Data] Found config.json at: {}", cand.display());
-            return cand.clone();
+    // Walk ancestors of each root, preserving order (cwd ancestors first).
+    for root in &roots {
+        for ancestor in root.ancestors() {
+            if ancestor.join("config.json").exists() {
+                println!("[Data] Found config.json at: {}", ancestor.display());
+                return ancestor.to_path_buf();
+            }
         }
     }
     let fallback = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     println!(
-        "[Data] No config.json found in candidates. Using: {}",
+        "[Data] No config.json found in any ancestor. Using: {}",
         fallback.display()
     );
     fallback
