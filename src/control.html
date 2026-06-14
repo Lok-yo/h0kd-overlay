@@ -393,6 +393,54 @@
   .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
   .conn-dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
 
+  /* ── Twitch panel ── */
+  #twBody { display: flex; flex-direction: column; gap: 8px; }
+  #twBody p { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  #twBody a { color: var(--accent); }
+  .tw-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  .tw-btn:hover { background: var(--accentH); }
+  .tw-btn.secondary { background: var(--s2); border: 1px solid var(--border); color: var(--text); }
+  .tw-btn.secondary:hover { background: var(--border); }
+  .tw-input {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 7px 10px;
+    width: 100%;
+    outline: none;
+  }
+  .tw-input:focus { border-color: var(--accent); }
+  .tw-code {
+    font-family: monospace;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-align: center;
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    color: var(--text);
+    user-select: text;
+  }
+  .tw-line { font-size: 12px; }
+  .tw-line b { color: var(--text); }
+  .tw-error { color: var(--danger); font-size: 12px; }
+  .conn-dot.warn { background: #f0a000; box-shadow: 0 0 6px #f0a000; }
+  .conn-dot.err  { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -411,6 +459,14 @@
 
 <main>
   <aside id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-header">
+        <h2>Twitch</h2>
+        <span class="conn-dot" id="twDot" title="Estado de conexión con Twitch"></span>
+      </div>
+      <div id="twBody"></div>
+    </div>
+
     <div class="sidebar-section">
       <div class="sidebar-header">
         <h2>Rewards</h2>
@@ -465,7 +521,7 @@
   <span id="connText">Servidor: <code id="serverUrl" title="Click para copiar">http://localhost:3001</code></span>
   <span style="flex:1"></span>
   <span>OBS Browser Source: <code id="overlayUrl" title="Click para copiar">http://localhost:3001/overlay</code></span>
-  <span>Streamer.bot Fetch URL: <code id="triggerUrl" title="Click para copiar">http://localhost:3001/api/trigger?reward=%rewardName%&amp;user=%userName%</code></span>
+  <span>Streamer.bot Fetch URL (opcional): <code id="triggerUrl" title="Click para copiar">http://localhost:3001/api/trigger?reward=%rewardName%&amp;user=%userName%</code></span>
 </footer>
 
 <script>
@@ -521,6 +577,103 @@
     // Probe server every 4s to update conn dot
     pingServer();
     setInterval(pingServer, 4000);
+
+    // Twitch status poll
+    pollTwitch();
+    setInterval(pollTwitch, 2000);
+  }
+
+  // ── Twitch (modo standalone, sin Streamer.bot) ─────────────────────────────
+
+  var twLastSig = '';
+
+  async function pollTwitch() {
+    var st;
+    try { st = await invoke('twitch_status'); }
+    catch (_) { return; }
+    var sig = JSON.stringify(st);
+    if (sig === twLastSig) return;   // no re-render mientras el usuario tipea
+    twLastSig = sig;
+    renderTwitch(st);
+  }
+
+  function renderTwitch(st) {
+    var dot = document.getElementById('twDot');
+    var body = document.getElementById('twBody');
+    var state = st.state || 'disconnected';
+
+    dot.className = 'conn-dot'
+      + (state === 'connected' ? ' on'
+      : state === 'pairing' || state === 'connecting' ? ' warn'
+      : state === 'error' ? ' err' : '');
+
+    // 1) Falta el Client ID → pedirlo.
+    if (!st.clientId) {
+      body.innerHTML =
+        '<p>Para correr sin Streamer.bot, registrá una app en '
+        + '<a href="https://dev.twitch.tv/console/apps" target="_blank">dev.twitch.tv</a> '
+        + '(Client Type: <b>Public</b>, OAuth Redirect: <code>http://localhost</code>) y pegá el Client ID:</p>'
+        + '<input class="tw-input" id="twClientId" placeholder="Client ID" />'
+        + '<button class="tw-btn" id="twSaveId">Guardar Client ID</button>';
+      document.getElementById('twSaveId').addEventListener('click', async function() {
+        var id = document.getElementById('twClientId').value.trim();
+        if (!id) return;
+        try { await invoke('twitch_set_client_id', { clientId: id }); twLastSig = ''; pollTwitch(); }
+        catch (e) { alert('Error: ' + e); }
+      });
+      return;
+    }
+
+    // 2) Emparejando (device code).
+    if (state === 'pairing') {
+      body.innerHTML =
+        '<p>Abrí <a href="' + esc(st.verificationUri || 'https://www.twitch.tv/activate') + '" target="_blank">'
+        + esc((st.verificationUri || '').replace(/^https?:\/\//, '') || 'twitch.tv/activate') + '</a> '
+        + 'e ingresá este código:</p>'
+        + '<div class="tw-code">' + esc(st.userCode || '') + '</div>'
+        + '<button class="tw-btn secondary" id="twCancel">Cancelar</button>';
+      document.getElementById('twCancel').addEventListener('click', twDisconnect);
+      return;
+    }
+
+    // 3) Conectando.
+    if (state === 'connecting') {
+      body.innerHTML =
+        '<p class="tw-line">Conectando a EventSub…</p>'
+        + '<button class="tw-btn secondary" id="twCancel">Cancelar</button>';
+      document.getElementById('twCancel').addEventListener('click', twDisconnect);
+      return;
+    }
+
+    // 4) Conectado.
+    if (state === 'connected') {
+      body.innerHTML =
+        '<p class="tw-line">✓ Conectado como <b>' + esc(st.login || '—') + '</b>. '
+        + 'Los canjes disparan videos directo, sin Streamer.bot.</p>'
+        + '<button class="tw-btn secondary" id="twDisc">Desconectar</button>';
+      document.getElementById('twDisc').addEventListener('click', twDisconnect);
+      return;
+    }
+
+    // 5) Error / desconectado.
+    body.innerHTML =
+      (state === 'error' && st.error ? '<p class="tw-error">⚠ ' + esc(st.error) + '</p>' : '')
+      + '<p class="tw-line">Client ID: <b>' + esc(st.clientId.slice(0, 8)) + '…</b></p>'
+      + '<button class="tw-btn" id="twConnect">Conectar con Twitch</button>'
+      + '<button class="tw-btn secondary" id="twChangeId">Cambiar Client ID</button>';
+    document.getElementById('twConnect').addEventListener('click', async function() {
+      try { await invoke('twitch_connect'); twLastSig = ''; pollTwitch(); }
+      catch (e) { alert('Error: ' + e); }
+    });
+    document.getElementById('twChangeId').addEventListener('click', async function() {
+      try { await invoke('twitch_set_client_id', { clientId: '' }); twLastSig = ''; pollTwitch(); }
+      catch (e) { alert('Error: ' + e); }
+    });
+  }
+
+  async function twDisconnect() {
+    try { await invoke('twitch_disconnect'); twLastSig = ''; pollTwitch(); }
+    catch (e) { alert('Error: ' + e); }
   }
 
   async function pingServer() {

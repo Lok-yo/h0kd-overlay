@@ -1,14 +1,30 @@
 mod server;
+mod twitch;
 
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::broadcast;
+use std::sync::{Arc, Mutex};
+use tokio::sync::{broadcast, mpsc};
+use twitch::{TwitchCmd, TwitchStatus};
 
 #[derive(Clone)]
 pub struct AppState {
     pub tx: broadcast::Sender<String>,
     pub data_dir: Arc<PathBuf>,
+    pub twitch: twitch::SharedStatus,
+    pub twitch_cmd: mpsc::Sender<TwitchCmd>,
+}
+
+/// Broadcast a `playVideo` event to every connected overlay.
+/// Single source of truth shared by the HTTP trigger, the admin "Probar"
+/// button, and the Twitch EventSub listener. Returns the number of overlays.
+pub fn broadcast_play_video(tx: &broadcast::Sender<String>, reward: &str, user: &str) -> usize {
+    let msg = json!({
+        "event": { "source": "General", "type": "Custom" },
+        "data": { "action": "playVideo", "reward": reward, "user": user }
+    })
+    .to_string();
+    tx.send(msg).unwrap_or(0)
 }
 
 fn default_config() -> Value {
@@ -86,14 +102,41 @@ fn list_videos(state: tauri::State<AppState>) -> Vec<String> {
 #[tauri::command]
 fn trigger_reward(state: tauri::State<AppState>, reward: String, user: Option<String>) -> Value {
     let user = user.unwrap_or_default();
-    let msg = json!({
-        "event": { "source": "General", "type": "Custom" },
-        "data": { "action": "playVideo", "reward": reward, "user": user }
-    })
-    .to_string();
-    let clients = state.tx.send(msg).unwrap_or(0);
+    let clients = broadcast_play_video(&state.tx, &reward, &user);
     println!("[Trigger] playVideo → {} | clientes: {}", reward, clients);
     json!({ "ok": true, "clients": clients })
+}
+
+// ── Twitch (standalone mode — no Streamer.bot) ───────────────────────────────
+
+#[tauri::command]
+fn twitch_status(state: tauri::State<AppState>) -> TwitchStatus {
+    state.twitch.lock().map(|s| s.clone()).unwrap_or_default()
+}
+
+#[tauri::command]
+async fn twitch_set_client_id(
+    state: tauri::State<'_, AppState>,
+    client_id: String,
+) -> Result<(), String> {
+    let cmd = state.twitch_cmd.clone();
+    cmd.send(TwitchCmd::SetClientId(client_id.trim().to_string()))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn twitch_connect(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let cmd = state.twitch_cmd.clone();
+    cmd.send(TwitchCmd::Connect).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn twitch_disconnect(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let cmd = state.twitch_cmd.clone();
+    cmd.send(TwitchCmd::Disconnect)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -121,9 +164,14 @@ pub fn run() {
     // tx.send() will return SendError when no subscribers exist; trigger_reward handles that via unwrap_or(0).
     let (tx, _) = broadcast::channel::<String>(64);
 
+    let twitch_shared = Arc::new(Mutex::new(TwitchStatus::default()));
+    let (twitch_cmd, twitch_rx) = mpsc::channel::<TwitchCmd>(8);
+
     let state = AppState {
         tx: tx.clone(),
         data_dir: data_dir.clone(),
+        twitch: twitch_shared,
+        twitch_cmd,
     };
 
     tauri::Builder::default()
@@ -135,6 +183,9 @@ pub fn run() {
                     eprintln!("[Server] failed to start: {}", e);
                 }
             });
+            // Twitch EventSub worker: lets the app run without Streamer.bot.
+            let twitch_state = state.clone();
+            tauri::async_runtime::spawn(twitch::worker_loop(twitch_state, twitch_rx));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -142,7 +193,11 @@ pub fn run() {
             save_config,
             list_videos,
             trigger_reward,
-            open_data_dir
+            open_data_dir,
+            twitch_status,
+            twitch_set_client_id,
+            twitch_connect,
+            twitch_disconnect
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

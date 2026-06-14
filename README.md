@@ -1,131 +1,122 @@
 # Stream Overlay
 
-Overlay para OBS que reproduce videos cuando viewers canjean Channel Points en Twitch.
-Reemplazo self-hosted de TriggerFyre — sin límite de videos, posición random, volumen por video.
+Overlay para OBS que reproduce videos cuando tus viewers canjean **Channel Points** en Twitch.
+Reemplazo self-hosted de TriggerFyre — sin límite de videos, posición random, volumen por video,
+múltiples instancias simultáneas del mismo video.
+
+Es una app de escritorio (Tauri) con un **panel de control nativo**. Se puede usar de dos formas:
+
+- **Modo standalone (recomendado):** la app se conecta **directo a Twitch** vía EventSub.
+  No necesitás Streamer.bot.
+- **Modo Streamer.bot (opcional):** si ya usás Streamer.bot, podés seguir disparando por HTTP.
 
 ---
 
 ## Requisitos
 
+- **Windows** (la app se distribuye como `.exe`)
 - **OBS Studio** (con Browser Source)
-- **Streamer.bot** v0.1.x o superior
-- Videos en formato `.mp4` (H.264 + AAC) o `.webm`
+- Una **Twitch Application** propia (Client ID) — gratis, se crea una sola vez (ver más abajo)
+- Videos en formato `.mp4` (H.264 + AAC) o `.webm` (VP9 + Opus)
 
 ---
 
-## Setup rápido
+## Instalación
 
-### 1. Archivos
+1. Descargá / generá `stream-overlay.exe`.
+2. Dejá al lado del `.exe` (en la misma carpeta) estos elementos:
+   ```
+   stream-overlay.exe
+   config.json        ← tu configuración (rewards → videos)
+   videos/            ← tus archivos de video
+   ```
+3. Doble click en el `.exe`. Se abre el panel de control y arranca un server local en `http://localhost:3001`.
 
-```
-TriggerFyreReplaceAPP/
-├── overlay.html      ← cargás esto en OBS
-├── config.json       ← editás esto para agregar rewards/videos
-└── videos/           ← ponés tus videos acá
-    ├── pop.mp4
-    └── ...
-```
-
-Copiá tus videos a la carpeta `videos/`.
-
----
-
-### 2. `config.json`
-
-Editá `config.json` para mapear cada reward a sus videos:
-
-```jsonc
-{
-  "rewards": {
-    "Nombre exacto del reward en Twitch": {
-      "videos": ["videos/mi-video.mp4"],
-      "width": 480,       // ancho en px (canvas 1920×1080)
-      "height": 270,      // alto en px
-      "volume": 0.8,      // 0.0 a 1.0
-      "maxDuration": 10000  // timeout de seguridad en ms
-    }
-  },
-  "safeZones": {
-    "exclude": [
-      {
-        "x": 1500, "y": 800,
-        "width": 420, "height": 280,
-        "name": "webcam"
-      }
-    ]
-  },
-  "canvas": { "width": 1920, "height": 1080 }
-}
-```
-
-**El nombre del reward debe ser exactamente igual al de Twitch** (mayúsculas incluidas).
-
-Si ponés varios videos en el array, se elige uno al azar en cada canje.
-
-`safeZones.exclude` define zonas donde los videos no aparecen (ej: tu webcam).
-Usá las coordenadas del canvas 1920×1080.
+> La app busca `config.json` en su propia carpeta (y carpetas superiores), así que mantené
+> el `.exe`, `config.json` y `videos/` juntos.
 
 ---
 
-### 3. Streamer.bot
+## Setup de Twitch (modo standalone)
 
-1. En Streamer.bot → **Servers/Clients** → **WebSocket Server** → habilitá en puerto `8080`.
-2. Creá una nueva **Action** llamada `Play Video Overlay`.
-3. Agregá estas sub-actions:
-   | Tipo | Nombre | Valor |
-   |------|--------|-------|
-   | Set Argument | `action` | `playVideo` |
-   | Set Argument | `reward` | `%rewardTitle%` |
-   | Set Argument | `user`   | `%userName%` |
-   | WebSocket Server | Broadcast | *(sin filtro)* |
-4. Creá un **Trigger**: Twitch → Channel Point Reward Redemption → **sin filtro de reward**.
+### 1. Crear tu Twitch Application (una sola vez)
 
-> **¿Por qué sin filtro?** Agregar un video nuevo solo requiere editar `config.json`.
-> Si filtrás en Streamer.bot, tenés que tocar dos lugares por cada reward nuevo.
+1. Andá a **https://dev.twitch.tv/console/apps** → **Register Your Application**.
+2. Completá:
+   - **Name:** cualquier nombre único (ej: `mi-overlay`).
+   - **OAuth Redirect URLs:** `https://localhost` → click **Add**.
+     *(No se usa realmente con Device Code Flow, pero el formulario lo exige.)*
+   - **Category:** cualquiera (ej: *Application Integration*).
+   - **Client Type:** **Public** ✅ *(importante)*.
+3. Click **Create** → entrá a la app → copiá el **Client ID**.
+   *(El Client Secret NO se necesita.)*
+
+### 2. Conectar la app
+
+1. En el panel de control, panel **"Twitch"** (arriba a la izquierda).
+2. Pegá el **Client ID** → **Guardar Client ID**.
+3. Click **Conectar con Twitch**.
+4. La app muestra un **código**. Andá a **https://www.twitch.tv/activate**, ingresalo y autorizá
+   (te pide permiso `channel:read:redemptions` para leer tus canjes).
+5. El panel cambia a **✓ Conectado como `<tu usuario>`**. Listo.
+
+El token queda guardado (`twitch.json`, local a tu máquina), así que **la próxima vez se reconecta solo**.
+A partir de acá, cada canje de Channel Points dispara el video correspondiente automáticamente.
 
 ---
 
-### 4. OBS
+## Configurar rewards y videos
+
+1. Copiá tus videos a la carpeta `videos/`.
+2. En el panel de control → **Rewards** → **+ Nuevo**. Configurá:
+   - **Nombre del reward:** debe coincidir **exactamente** con el título del reward en Twitch
+     (mayúsculas incluidas — Twitch manda el `reward.title`).
+   - **Videos:** elegí uno o más de la carpeta `videos/`. Si hay varios, se elige uno al azar por canje.
+   - **Volumen**, **ancho/alto** (caja máxima — el video mantiene su aspect ratio), **duración máxima**.
+   - **Respetar safe zones** (que el video no aparezca sobre tu webcam, etc.).
+3. **Safe Zones:** definí rectángulos (x, y, ancho, alto) donde los videos no deben aparecer.
+4. **Canvas:** la resolución de tu escena (por defecto 1920×1080).
+5. Click **Guardar config.json**.
+
+> También podés editar `config.json` a mano (botón **📁 Carpeta** abre la ubicación).
+
+---
+
+## OBS
 
 1. En tu escena → **Agregar fuente** → **Browser**.
-2. Marcá **Local file** → buscá `overlay.html`.
+2. **NO** marques "Local file". En **URL** poné:
+   ```
+   http://localhost:3001/overlay
+   ```
 3. Width: `1920` / Height: `1080` (o tu resolución de canvas).
 4. **Desmarcá** "Shutdown source when not visible".
 5. **Desmarcá** "Refresh browser when scene becomes active".
 6. Poné el Browser Source **encima de todo** en la escena.
 
----
-
-## Agregar un video nuevo
-
-1. Copiá el archivo a `videos/`.
-2. Editá `config.json` y agregá la entrada.
-3. Creá el reward en Twitch con ese nombre exacto.
-4. Click derecho en el Browser Source en OBS → **Refresh** (o usá la tecla `R` en DevTools).
-5. Listo. **No hay que tocar Streamer.bot ni reiniciar OBS.**
+> La app tiene que estar abierta para que el overlay funcione (sirve el `/overlay` y el WebSocket).
 
 ---
 
-## Probar sin Streamer.bot / Twitch
+## Probar un reward
 
-### Opción A — DevTools (más fácil)
+En el panel de control, arriba: elegí un reward en el desplegable y click **▶ Probar**.
+Si el overlay está conectado en OBS, vas a ver el video. (Si dice "⚠ Sin overlay conectado",
+revisá que el Browser Source apunte a `http://localhost:3001/overlay` y que la app esté abierta.)
 
-1. Click derecho en el Browser Source → **Interact** → F12 para abrir DevTools.
-2. En la consola ejecutá:
-   ```js
-   spawnVideo("Nombre exacto del reward")
+---
+
+## Modo Streamer.bot (opcional)
+
+Si preferís usar Streamer.bot en vez del modo standalone, el endpoint HTTP sigue activo:
+
+1. Creá una **Action** con un sub-action **Fetch URL** (HTTP GET) a:
    ```
-3. El video aparece en posición random en el overlay.
+   http://localhost:3001/api/trigger?reward=%rewardName%&user=%userName%
+   ```
+2. **Trigger:** Twitch → Channel Point Reward Redemption (sin filtro de reward).
 
-### Opción B — Mock WS server (Node.js)
-
-```bash
-npm install ws
-node mock-ws-server.js
-```
-
-El script levanta un WS server en el puerto 8080 y te pide el nombre del reward
-por consola. Útil para testear el flujo completo.
+La Fetch URL está disponible para copiar en el footer del panel de control.
 
 ---
 
@@ -133,30 +124,36 @@ por consola. Útil para testear el flujo completo.
 
 | Problema | Qué revisar |
 |----------|-------------|
-| No se conecta al WS | Streamer.bot → WebSocket Server habilitado en puerto 8080 |
-| Video no aparece | Abrí DevTools → consola → ¿hay errores? Probá `spawnVideo()` manual |
-| Sin audio | Asegurate de que OBS tenga el Browser Source con audio habilitado |
-| Video fuera del canvas | Revisá `width`/`height` en `config.json` vs tamaño real del video |
-| Overlay fondo blanco/negro | Browser Source debe tener "Allow transparency" activado (OBS lo hace por default con local files) |
-| Reward no dispara | El nombre en `config.json` debe ser idéntico al de Twitch |
+| El panel Twitch pide Client ID de nuevo | Asegurate de haber guardado el Client ID y de que la Twitch App sea **Public** |
+| "Suscripción rechazada" | El Client ID debe ser de una app **Public** y autorizaste con tu cuenta de broadcaster |
+| El canje no dispara video | El nombre del reward en el panel debe ser **idéntico** al de Twitch (mayúsculas incluidas) |
+| "Sin overlay conectado" al probar | El Browser Source debe apuntar a `http://localhost:3001/overlay` y la app estar abierta |
+| Video no aparece | Verificá que el archivo exista en `videos/` (el panel marca ⚠ si falta) |
+| Sin audio | El Browser Source de OBS debe tener audio habilitado; revisá el volumen del reward |
+| Sesión expirada | Reconectá desde el panel Twitch (Conectar → activar código de nuevo) |
 
 ---
 
-## Hot-reload de config
+## Para desarrolladores
 
-Con DevTools abierto en el Browser Source, presioná **`R`** para recargar `config.json`
-sin refrescar la página completa. Útil mientras estás editando la config en vivo.
+```bash
+# Correr en modo dev (requiere Rust + Tauri CLI + VS Build Tools)
+cargo tauri dev
 
----
+# Generar el .exe + instalador
+cargo tauri build
+```
 
-## Estructura de archivos
+Estructura:
 
 ```
-overlay.html          ← overlay principal (todo inline, sin build)
-config.json           ← tu configuración
-videos/               ← tus archivos .mp4 / .webm
-mock-ws-server.js     ← server de prueba (opcional, requiere Node.js + ws)
-CLAUDE.md             ← contexto del proyecto para Claude Code
-README.md             ← este archivo
-.gitignore            ← ignora videos/ en git
+src-tauri/src/lib.rs      ← Tauri commands + arranque
+src-tauri/src/server.rs   ← server axum (HTTP + WebSocket) en :3001
+src-tauri/src/twitch.rs   ← OAuth Device Code Flow + cliente EventSub
+src/control.html          ← panel de control (UI nativa)
+src/overlay.html          ← overlay servido en /overlay (embebido)
+config.json               ← configuración de rewards
+videos/                   ← videos (ignorados en git)
 ```
+
+Datos locales (no se commitean): `twitch.json` (tokens OAuth), `videos/`.

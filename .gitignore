@@ -12,3 +12,6 @@ src-tauri/Cargo.lock
 
 # Build logs
 *.log
+
+# Twitch OAuth tokens (per-machine secrets)
+twitch.json
