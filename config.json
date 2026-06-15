@@ -1,151 +1,151 @@
 {
+  "canvas": {
+    "height": 1080,
+    "width": 1920
+  },
   "rewards": {
-    "Grito XD": {
-      "videos": [
-        "videos/EhriGime.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "FRACASADO": {
-      "videos": [
-        "videos/SoyUnFracasado.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "KEKE": {
-      "videos": [
-        "videos/KEKE.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
     "ADVINCULA": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
       "videos": [
         "videos/ADVINCULA.mp4"
       ],
-      "width": 480,
-      "height": 270,
       "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "XD": {
-      "videos": [
-        "videos/XD.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "MMM": {
-      "videos": [
-        "videos/MMM.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "DED": {
-      "videos": [
-        "videos/DED.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "TROSTE": {
-      "videos": [
-        "videos/TROSTE.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "DATO": {
-      "videos": [
-        "videos/BUENDATO.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "ME ASUSTE": {
-      "videos": [
-        "videos/AMEASUSTE.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
-    },
-    "CALLATE": {
-      "videos": [
-        "videos/CALLATE.mp4"
-      ],
-      "width": 480,
-      "height": 270,
-      "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
+      "width": 480
     },
     "BANEADO": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
       "videos": [
         "videos/BANEADO.mp4"
       ],
-      "width": 480,
-      "height": 270,
       "volume": 0.8,
-      "maxDuration": 10000,
-      "respectSafeZones": true
+      "width": 480
     },
-    "MIAU": {
-      "videos": [
-        "videos/MIAU.mp4"
-      ],
-      "width": 480,
+    "CALLATE": {
       "height": 270,
-      "volume": 0.3,
       "maxDuration": 10000,
-      "respectSafeZones": true
+      "respectSafeZones": true,
+      "videos": [
+        "videos/CALLATE.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
+    },
+    "DATO": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/BUENDATO.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
+    },
+    "DED": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/DED.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
+    },
+    "FRACASADO": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/SoyUnFracasado.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
     },
     "GRASA": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
       "videos": [
         "videos/GRASA.mp4"
       ],
-      "width": 480,
-      "height": 270,
       "volume": 0.8,
+      "width": 480
+    },
+    "Grito XD": {
+      "height": 270,
       "maxDuration": 10000,
-      "respectSafeZones": true
+      "respectSafeZones": true,
+      "videos": [
+        "videos/EhriGime.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
+    },
+    "KEKE": {
+      "height": 612,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/KEKE.mp4"
+      ],
+      "volume": 0.8,
+      "width": 436
+    },
+    "ME ASUSTE": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/AMEASUSTE.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
+    },
+    "MIAU": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/MIAU.mp4"
+      ],
+      "volume": 0.3,
+      "width": 480
+    },
+    "MMM": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/MMM.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
+    },
+    "TROSTE": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/TROSTE.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
+    },
+    "XD": {
+      "height": 270,
+      "maxDuration": 10000,
+      "respectSafeZones": true,
+      "videos": [
+        "videos/XD.mp4"
+      ],
+      "volume": 0.8,
+      "width": 480
     }
   },
   "safeZones": {
     "exclude": []
-  },
-  "canvas": {
-    "width": 1920,
-    "height": 1080
   }
 }

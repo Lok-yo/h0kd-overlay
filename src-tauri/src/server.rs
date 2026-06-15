@@ -156,7 +156,11 @@ async fn post_config_handler(
         }
     };
     match std::fs::write(state.data_dir.join("config.json"), pretty) {
-        Ok(_) => Json(json!({ "ok": true })).into_response(),
+        Ok(_) => {
+            // Live-reload connected overlays (same as the Tauri save command).
+            let _ = state.tx.send(crate::reload_config_msg());
+            Json(json!({ "ok": true })).into_response()
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),

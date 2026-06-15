@@ -78,7 +78,20 @@ fn get_config(state: tauri::State<AppState>) -> Value {
 #[tauri::command]
 fn save_config(state: tauri::State<AppState>, cfg: Value) -> Result<(), String> {
     let pretty = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
-    std::fs::write(state.data_dir.join("config.json"), pretty).map_err(|e| e.to_string())
+    std::fs::write(state.data_dir.join("config.json"), pretty).map_err(|e| e.to_string())?;
+    // Tell connected overlays to reload their config so size/volume/etc changes
+    // apply immediately, without refreshing the OBS Browser Source.
+    let _ = state.tx.send(reload_config_msg());
+    Ok(())
+}
+
+/// Message that asks every connected overlay to re-fetch config.json.
+fn reload_config_msg() -> String {
+    json!({
+        "event": { "source": "System", "type": "Custom" },
+        "data": { "action": "reloadConfig" }
+    })
+    .to_string()
 }
 
 #[tauri::command]

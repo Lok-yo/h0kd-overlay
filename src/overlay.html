@@ -221,6 +221,9 @@
             && data.action === 'playVideo' && data.reward) {
           log(`playVideo: "${data.reward}" por ${data.user || '?'}`);
           spawnVideo(data.reward);
+        } else if (data.action === 'reloadConfig') {
+          log('Config reload solicitado por el panel');
+          loadConfig();
         }
       };
 

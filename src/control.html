@@ -219,6 +219,57 @@
   .inline-row { display: flex; gap: 12px; }
   .inline-row .field { flex: 1; }
 
+  /* Size preview (mini-canvas con caja redimensionable) */
+  .size-preview {
+    position: relative;
+    background:
+      linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 25%,
+      linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0 / 25% 100%,
+      var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .size-preview .sp-zone {
+    position: absolute;
+    background: rgba(192,57,43,.18);
+    border: 1px dashed rgba(192,57,43,.7);
+    pointer-events: none;
+  }
+  .size-preview .sp-box {
+    position: absolute;
+    top: 0; left: 0;
+    border: 1px dashed var(--accent);
+    box-sizing: border-box;
+  }
+  .size-preview .sp-video {
+    position: absolute;
+    top: 0; left: 0;
+    background: rgba(145,71,255,.45);
+    border: 1px solid var(--accent);
+    box-sizing: border-box;
+  }
+  .size-readout {
+    font-size: 11px;
+    color: var(--muted);
+    margin: -2px 0 8px;
+    min-height: 14px;
+  }
+  .size-preview .sp-handle {
+    position: absolute;
+    left: 0; top: 0;
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border: 2px solid #fff;
+    border-radius: 3px;
+    cursor: nwse-resize;
+    box-shadow: 0 1px 4px rgba(0,0,0,.5);
+    z-index: 2;
+  }
+  .size-hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+
   /* Volume slider */
   .vol-row { display: flex; align-items: center; gap: 12px; }
   input[type=range] {
@@ -535,6 +586,7 @@
   var videos  = [];
   var sel     = null;   // reward name currently selected
   var dirty   = false;
+  var videoMetaCache = {};  // path → { w, h } real video resolution
 
   // ── Boot ─────────────────────────────────────────────────────────────────
 
@@ -849,9 +901,20 @@
         + '</div>'
       + '</div>'
 
-      + '<div class="inline-row">'
-        + '<div class="field"><label>Ancho (px)</label><input type="number" id="ri-w" value="' + (rc.width||480) + '" /></div>'
-        + '<div class="field"><label>Alto (px)</label><input type="number" id="ri-h" value="' + (rc.height||270) + '" /></div>'
+      + '<div class="field">'
+        + '<label>Tamaño del video</label>'
+        + '<div class="size-hint">Arrastrá la esquina ◢ para ajustar el tamaño (mantiene la proporción real del video). En rojo, las safe zones.</div>'
+        + '<div class="size-preview" id="sizePreview">'
+          + '<div class="sp-box" id="sizeBox">'
+            + '<div class="sp-video" id="sizeVideo"></div>'
+            + '<span class="sp-handle" id="sizeHandle"></span>'
+          + '</div>'
+        + '</div>'
+        + '<div class="size-readout" id="sizeReadout"></div>'
+        + '<div class="inline-row">'
+          + '<div class="field" style="margin-bottom:0"><label>Ancho (px)</label><input type="number" id="ri-w" value="' + (rc.width||480) + '" /></div>'
+          + '<div class="field" style="margin-bottom:0"><label>Alto (px)</label><input type="number" id="ri-h" value="' + (rc.height||270) + '" /></div>'
+        + '</div>'
       + '</div>'
 
       + '<div class="field">'
@@ -883,15 +946,7 @@
       markDirty();
     });
 
-    document.getElementById('ri-w').addEventListener('input', function() {
-      cfg.rewards[name].width = parseInt(this.value) || 480;
-      markDirty();
-    });
-
-    document.getElementById('ri-h').addEventListener('input', function() {
-      cfg.rewards[name].height = parseInt(this.value) || 270;
-      markDirty();
-    });
+    setupSizePreview(name);
 
     document.getElementById('ri-dur').addEventListener('input', function() {
       cfg.rewards[name].maxDuration = parseInt(this.value) || 10000;
@@ -931,6 +986,162 @@
       renderAll();
       showEmpty();
     });
+  }
+
+  // ── Size preview (mini-canvas con caja redimensionable) ───────────────────
+
+  function setupSizePreview(name) {
+    var rc      = cfg.rewards[name];
+    var canvasW = (cfg.canvas && cfg.canvas.width)  || 1920;
+    var canvasH = (cfg.canvas && cfg.canvas.height) || 1080;
+    var PREV_W  = 320;
+    var scale   = PREV_W / canvasW;
+
+    var preview = document.getElementById('sizePreview');
+    var box     = document.getElementById('sizeBox');
+    var vid     = document.getElementById('sizeVideo');
+    var readout = document.getElementById('sizeReadout');
+    var handle  = document.getElementById('sizeHandle');
+    var inputW  = document.getElementById('ri-w');
+    var inputH  = document.getElementById('ri-h');
+    if (!preview) return;
+
+    preview.style.width  = PREV_W + 'px';
+    preview.style.height = Math.round(canvasH * scale) + 'px';
+
+    // Safe zones (en rojo, detrás de la caja).
+    var zones = (cfg.safeZones && cfg.safeZones.exclude) || [];
+    zones.forEach(function(z) {
+      var el = document.createElement('div');
+      el.className = 'sp-zone';
+      el.style.left   = Math.round((z.x || 0) * scale) + 'px';
+      el.style.top    = Math.round((z.y || 0) * scale) + 'px';
+      el.style.width  = Math.round((z.width  || 0) * scale) + 'px';
+      el.style.height = Math.round((z.height || 0) * scale) + 'px';
+      el.title = z.name || 'safe zone';
+      preview.insertBefore(el, box);
+    });
+
+    function clampW(v) { return Math.max(20, Math.min(canvasW, Math.round(v))); }
+    function clampH(v) { return Math.max(20, Math.min(canvasH, Math.round(v))); }
+
+    var firstVideo = (rc.videos && rc.videos[0]) || null;
+    var meta = firstVideo ? videoMetaCache[firstVideo] : null;
+
+    function orientation(w, h) {
+      if (h > w * 1.05) return 'vertical';
+      if (w > h * 1.05) return 'horizontal';
+      return 'cuadrado';
+    }
+
+    // Draw the box (max constraint) and, if we know the video's real
+    // resolution, the actual rendered rect fitted inside it (same math as
+    // the overlay: scale = min(boxW/vw, boxH/vh)).
+    function placeHandle(cornerXpx, cornerYpx) {
+      handle.style.left = (cornerXpx - 7) + 'px';
+      handle.style.top  = (cornerYpx - 7) + 'px';
+    }
+
+    function render() {
+      var w = rc.width || 480, h = rc.height || 270;
+
+      if (meta && meta.w && meta.h) {
+        // Show only the real rendered video (box fitted to its aspect ratio),
+        // so the outline hugs the violet rect exactly.
+        var s  = Math.min(w / meta.w, h / meta.h);
+        var fw = Math.round(meta.w * s);
+        var fh = Math.round(meta.h * s);
+        box.style.borderStyle = 'none';
+        box.style.width  = Math.max(2, fw * scale) + 'px';
+        box.style.height = Math.max(2, fh * scale) + 'px';
+        vid.style.display = 'block';
+        vid.style.width   = '100%';
+        vid.style.height  = '100%';
+        placeHandle(fw * scale, fh * scale);
+        readout.textContent =
+          fw + '×' + fh + ' px  (' + orientation(meta.w, meta.h) + ', proporción ' + meta.w + '×' + meta.h + ')';
+      } else {
+        // No video metadata yet → show the raw box as a dashed rectangle.
+        box.style.borderStyle = 'dashed';
+        box.style.width  = Math.max(2, w * scale) + 'px';
+        box.style.height = Math.max(2, h * scale) + 'px';
+        vid.style.display = 'none';
+        placeHandle(w * scale, h * scale);
+        readout.textContent = firstVideo
+          ? w + '×' + h + ' px  ·  leyendo proporción del video…'
+          : w + '×' + h + ' px  ·  sin video asignado';
+      }
+    }
+    render();
+
+    // Probe the real video resolution once (cached). Served by the local
+    // server at /videos/<file>; metadata load is not blocked by CORS.
+    if (firstVideo && !meta) {
+      var probe = document.createElement('video');
+      probe.preload = 'metadata';
+      probe.muted = true;
+      probe.src = 'http://127.0.0.1:3001/' + firstVideo;
+      probe.addEventListener('loadedmetadata', function() {
+        if (probe.videoWidth && probe.videoHeight) {
+          videoMetaCache[firstVideo] = { w: probe.videoWidth, h: probe.videoHeight };
+          meta = videoMetaCache[firstVideo];
+          render();
+        }
+      });
+      probe.addEventListener('error', function() {
+        readout.textContent = 'Caja ' + (rc.width || 480) + '×' + (rc.height || 270)
+          + '  ·  no se pudo leer el video';
+      });
+    }
+
+    inputW.addEventListener('input', function() {
+      rc.width = clampW(parseInt(this.value) || 480); render(); markDirty();
+    });
+    inputH.addEventListener('input', function() {
+      rc.height = clampH(parseInt(this.value) || 270); render(); markDirty();
+    });
+
+    // Resize arrastrando la esquina inferior-derecha.
+    var dragging = false, startX = 0, startY = 0, startW = 0, startH = 0;
+    handle.addEventListener('pointerdown', function(e) {
+      e.preventDefault();
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startW = rc.width || 480; startH = rc.height || 270;
+      // Drag continues from the video's currently rendered size (no jump).
+      if (meta && meta.w && meta.h) {
+        var s0 = Math.min(startW / meta.w, startH / meta.h);
+        startW = Math.round(meta.w * s0);
+        startH = Math.round(meta.h * s0);
+      }
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    handle.addEventListener('pointermove', function(e) {
+      if (!dragging) return;
+      var tW = startW + (e.clientX - startX) / scale;
+      var tH = startH + (e.clientY - startY) / scale;
+      if (meta && meta.w && meta.h) {
+        // Scale the box to the video's aspect ratio so the handle stays glued
+        // to the video corner and it grows/shrinks proportionally.
+        var s = Math.min(clampW(tW) / meta.w, clampH(tH) / meta.h);
+        rc.width  = clampW(meta.w * s);
+        rc.height = clampH(meta.h * s);
+      } else {
+        rc.width  = clampW(tW);
+        rc.height = clampH(tH);
+      }
+      inputW.value = rc.width;
+      inputH.value = rc.height;
+      render();
+      markDirty();
+    });
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+    handle.addEventListener('pointerup', endDrag);
+    handle.addEventListener('pointercancel', endDrag);
   }
 
   // ── Reward actions ────────────────────────────────────────────────────────
