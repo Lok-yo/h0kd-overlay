@@ -549,8 +549,25 @@
     background: var(--s1); border: 1px solid var(--border); border-radius: 14px;
     width: 470px; max-width: 100%; max-height: 100%; overflow: auto;
     padding: 28px; text-align: center;
+    position: relative; z-index: 0;   /* stacking context so the orbit can go behind the text */
   }
-  .onb-oc { width: 112px; height: 112px; border-radius: 14px; margin-bottom: 6px; }
+  .onb-oc { width: 112px; height: 112px; border-radius: 14px; margin-bottom: 6px; cursor: pointer; transition: transform .15s; }
+  .onb-oc:hover { transform: scale(1.06); }
+  .onb-oc-wrap { position: relative; display: inline-block; margin-bottom: 6px; }
+  /* A small arrow orbiting the OC, pointing at it, to invite a click.
+     z-index:-1 keeps it above the card background but behind the text/OC, so
+     it passes behind the title without blocking clicks on the OC. */
+  .onb-orbit {
+    position: absolute; top: 50%; left: 50%; width: 0; height: 0; z-index: -1;
+    pointer-events: none; animation: onbOrbit 5s linear infinite;
+  }
+  @keyframes onbOrbit { to { transform: rotate(360deg); } }
+  .onb-pointer {
+    position: absolute; left: 70px; top: -11px; width: 22px; height: 22px;
+    color: var(--accent); filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+    animation: onbPointerPulse 1s ease-in-out infinite;
+  }
+  @keyframes onbPointerPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.28); } }
   .onb-card h2 { font-size: 20px; font-weight: 800; margin: 4px 0 4px; }
   .onb-card h2 span { color: var(--accent); }
   .onb-sub { color: var(--muted); font-size: 13px; margin: 0 0 20px; line-height: 1.45; }
@@ -600,7 +617,10 @@
 
 <div class="onb-overlay" id="onboarding">
   <div class="onb-card">
-    <img class="onb-oc" src="assets/h0kdSPIN.webp" alt="" />
+    <div class="onb-oc-wrap">
+      <a id="onbOcLink" href="https://www.twitch.tv/h0kd" target="_blank" title="Visitá mi canal de Twitch"><img class="onb-oc" src="assets/h0kdSPIN.webp" alt="Canal de Twitch h0kd" /></a>
+      <div class="onb-orbit" aria-hidden="true"><svg class="onb-pointer" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></div>
+    </div>
     <h2>¡Bienvenido a Stream <span>Overlay</span>!</h2>
     <p class="onb-sub">Reproducí videos en tu stream cuando tus viewers canjean Channel Points en Twitch. Tres pasos y estás listo:</p>
     <div class="onb-steps">
@@ -610,7 +630,7 @@
       </div>
       <div class="onb-step">
         <span class="onb-num">2</span>
-        <div class="onb-step-body"><b>Agregá videos y rewards.</b> Sumá tus videos con <b>+ Agregar</b> y creá rewards con el <b>mismo nombre exacto</b> que tienen en Twitch.</div>
+        <div class="onb-step-body"><b>Creá rewards y vinculalas.</b> Hacé <b>+ Nuevo</b>, elegí a qué <b>reward de tu Twitch</b> se vincula en la lista, y agregale tus videos con <b>+ Agregar</b>.</div>
       </div>
       <div class="onb-step">
         <span class="onb-num">3</span>
@@ -773,6 +793,19 @@
     // Onboarding: shown on first run; the app icon reopens it anytime.
     document.getElementById('onbClose').addEventListener('click', hideOnboarding);
     document.getElementById('appIcon').addEventListener('click', showOnboarding);
+    // Easter egg: clicking the OC plays a party horn, then opens the channel.
+    // We handle the open ourselves (stopping the global link handler) and delay
+    // it so the horn plays while the app still has focus — opening the browser
+    // backgrounds the webview and would otherwise suspend the audio.
+    document.getElementById('onbOcLink').addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      try { var horn = new Audio('assets/party-horn.mp3'); horn.volume = 0.35; horn.play(); } catch (_) {}
+      var r = this.getBoundingClientRect();
+      burstConfetti(r.left + r.width / 2, r.top + r.height / 2);
+      var url = this.getAttribute('href');
+      setTimeout(function() { invoke('open_url', { url: url }).catch(function(){}); }, 700);
+    });
     try { if (!localStorage.getItem('onboardingSeen')) showOnboarding(); } catch (_) {}
 
     // Auto-update: check on launch; user decides when to install.
@@ -1622,6 +1655,12 @@
     var el = document.getElementById('onboarding');
     el.classList.remove('closing');
     el.classList.add('open');
+    // WebKit doesn't always resume CSS animations after the modal was hidden
+    // (display:none), so restart the orbiting arrow + its pulse explicitly.
+    ['.onb-orbit', '.onb-pointer'].forEach(function(sel2) {
+      var n = el.querySelector(sel2);
+      if (n) { n.style.animation = 'none'; void n.offsetWidth; n.style.animation = ''; }
+    });
   }
   function hideOnboarding() {
     var el = document.getElementById('onboarding');
@@ -1634,6 +1673,58 @@
       el.removeEventListener('animationend', done);
     };
     el.addEventListener('animationend', done);
+  }
+
+  // Self-contained confetti burst from (x, y) — no external library.
+  function burstConfetti(x, y) {
+    var canvas = document.createElement('canvas');
+    canvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:200';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    var ctx = canvas.getContext('2d');
+    var colors = ['#9147ff', '#ff8ec4', '#7fe0d4', '#ffd86b', '#ffffff'];
+    var parts = [];
+    for (var i = 0; i < 90; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var sp = 4 + Math.random() * 7;
+      parts.push({
+        x: x, y: y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 4,              // bias the burst upward
+        g: 0.22 + Math.random() * 0.1,
+        size: 5 + Math.random() * 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 0.3,
+        life: 0
+      });
+    }
+    var maxLife = 90;
+    function frame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      var alive = false;
+      parts.forEach(function(p) {
+        if (p.life > maxLife) return;
+        alive = true;
+        p.life++;
+        p.vy += p.g;
+        p.x += p.vx; p.y += p.vy;
+        p.rot += p.vr;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - p.life / maxLife);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        ctx.restore();
+      });
+      if (alive) requestAnimationFrame(frame);
+      else canvas.remove();
+    }
+    requestAnimationFrame(frame);
+    // Safety net: always clean up even if the window is backgrounded mid-animation.
+    setTimeout(function() { if (canvas.parentNode) canvas.remove(); }, 4000);
   }
 
   // ── Util ──────────────────────────────────────────────────────────────────
