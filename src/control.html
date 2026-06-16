@@ -22,6 +22,9 @@
     font-size: 13px;
     background: var(--bg);
     color: var(--text);
+    /* Render native controls (number spinners, selects, scrollbars) in dark
+       mode so the spinner arrows aren't nearly invisible on the dark bg. */
+    color-scheme: dark;
     display: grid;
     grid-template-rows: 52px 1fr 28px;
     height: 100vh;
@@ -621,7 +624,8 @@
   var videos  = [];
   var sel     = null;   // reward name currently selected
   var dirty   = false;
-  var videoMetaCache = {};  // path → { w, h } real video resolution
+  var videoMetaCache = {};  // path → { w, h, dur } real video metadata
+  var durTouched = {};      // reward name → true once the user edits its duration by hand
 
   // Undo/redo history. Each entry is a JSON snapshot of { cfg, sel }. Rapid
   // edits (e.g. dragging the size handle) are coalesced via a debounce so one
@@ -1122,6 +1126,7 @@
       var s = parseInt(this.value) || 1;
       if (s < 1) s = 1;
       if (capSec && s > capSec) { s = Math.round(capSec); this.value = s; }
+      durTouched[name] = true;   // user chose a value → stop auto-tracking the video length
       cfg.rewards[name].maxDuration = s * 1000;
       document.getElementById('durReadout').textContent = formatDur(cfg.rewards[name].maxDuration);
       markDirty();
@@ -1421,10 +1426,13 @@
     probe.addEventListener('error', function() { cb(null); });
   }
 
-  // Detect the real duration of the reward's video(s) and use it as the cap for
-  // the "Duración máxima" field: you can't set more than the video lasts, and an
-  // unset/legacy/over-the-cap value is auto-filled to the full video length so
-  // the clip never gets cut off. A shorter value the user chose is preserved.
+  // Detect the real duration of the reward's video(s) and use the LONGEST as the
+  // cap for the "Duración máxima" field — covers both random (any of N may play)
+  // and "all at once" (the set lasts as long as its longest clip). Until the user
+  // edits the field by hand, maxDuration auto-tracks that longest length (growing
+  // when a longer video is added, shrinking when it's removed), so clips never get
+  // cut off. Once the user sets a value, it's preserved (only clamped if it would
+  // exceed the video length).
   function setupDuration(name) {
     var rc      = cfg.rewards[name];
     var input   = document.getElementById('ri-dur');
@@ -1449,10 +1457,12 @@
       var capMs = Math.round(longest * 1000);
       input.max = Math.ceil(longest);
       var cur = rc.maxDuration || 0;
-      if (cur === 0 || cur === 10000 || cur > capMs) {  // unset / legacy default / over the cap
-        rc.maxDuration = capMs;
+      // Auto-track the longest video while untouched (durTouched is false for any
+      // value loaded from disk too, so legacy defaults get corrected); always clamp
+      // a value that exceeds the (possibly shrunk) video length.
+      if (!durTouched[name] || cur > capMs) {
+        if (rc.maxDuration !== capMs) { rc.maxDuration = capMs; markDirty(); }
         input.value = Math.round(longest);
-        markDirty();
       }
       readout.textContent = formatDur(rc.maxDuration);
       hint.textContent = 'Máximo ' + formatDur(capMs) + ' (duración del video'
