@@ -1288,6 +1288,7 @@
         cfg.rewards[name].videos.splice(i, 1);
         markDirty();
         renderEditor(name);
+        renderRewardsList();   // refresh the sidebar video count
       });
     });
 
@@ -1299,6 +1300,7 @@
         cfg.rewards[name].videos.push(sel2);
         markDirty();
         renderEditor(name);
+        renderRewardsList();   // refresh the sidebar video count
       }
     });
 
