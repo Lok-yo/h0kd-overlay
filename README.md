@@ -4,11 +4,8 @@ Overlay para OBS que reproduce videos cuando tus viewers canjean **Channel Point
 Reemplazo self-hosted de TriggerFyre — sin límite de videos, posición random, volumen por video,
 múltiples instancias simultáneas del mismo video.
 
-Es una app de escritorio (Tauri) con un **panel de control nativo**. Se puede usar de dos formas:
-
-- **Modo standalone (recomendado):** la app se conecta **directo a Twitch** vía EventSub.
-  No necesitás Streamer.bot.
-- **Modo Streamer.bot (opcional):** si ya usás Streamer.bot, podés seguir disparando por HTTP.
+Es una app de escritorio (Tauri) con un **panel de control nativo** que se conecta
+**directo a Twitch** vía EventSub. No necesitás Streamer.bot ni ningún otro programa.
 
 ---
 
@@ -16,52 +13,34 @@ Es una app de escritorio (Tauri) con un **panel de control nativo**. Se puede us
 
 - **Windows** (`.exe` / instalador) o **macOS** (`.app` / `.dmg`)
 - **OBS Studio** (con Browser Source)
-- Una **Twitch Application** propia (Client ID) — gratis, se crea una sola vez (ver más abajo)
+- Una cuenta de Twitch (te conectás con un click — no hace falta registrar nada)
 - Videos en formato `.mp4` (H.264 + AAC) o `.webm` (VP9 + Opus)
 
 ---
 
 ## Instalación
 
-1. Descargá / generá `stream-overlay.exe`.
-2. Dejá al lado del `.exe` (en la misma carpeta) estos elementos:
-   ```
-   stream-overlay.exe
-   config.json        ← tu configuración (rewards → videos)
-   videos/            ← tus archivos de video
-   ```
-3. Doble click en el `.exe`. Se abre el panel de control y arranca un server local en `http://localhost:3001`.
+1. Descargá el instalador para tu sistema desde **Releases** y ejecutalo.
+2. Abrí la app. Se abre el panel de control y arranca un server local en `http://localhost:3001`.
 
-> La app busca `config.json` en su propia carpeta (y carpetas superiores), así que mantené
-> el `.exe`, `config.json` y `videos/` juntos.
+> La app guarda tu configuración y videos en una carpeta propia de tu usuario
+> (Windows: `%APPDATA%\Stream Overlay`, macOS: `~/Library/Application Support/Stream Overlay`).
+> El botón **Carpeta** del panel la abre directamente.
 
 ---
 
-## Setup de Twitch (modo standalone)
+## Conectar con Twitch
 
-### 1. Crear tu Twitch Application (una sola vez)
-
-1. Andá a **https://dev.twitch.tv/console/apps** → **Register Your Application**.
-2. Completá:
-   - **Name:** cualquier nombre único (ej: `mi-overlay`).
-   - **OAuth Redirect URLs:** `https://localhost` → click **Add**.
-     *(No se usa realmente con Device Code Flow, pero el formulario lo exige.)*
-   - **Category:** cualquiera (ej: *Application Integration*).
-   - **Client Type:** **Public** ✅ *(importante)*.
-3. Click **Create** → entrá a la app → copiá el **Client ID**.
-   *(El Client Secret NO se necesita.)*
-
-### 2. Conectar la app
-
-1. En el panel de control, panel **"Twitch"** (arriba a la izquierda).
-2. Pegá el **Client ID** → **Guardar Client ID**.
-3. Click **Conectar con Twitch**.
-4. La app muestra un **código**. Andá a **https://www.twitch.tv/activate**, ingresalo y autorizá
+1. En el panel de control, panel **"Twitch"** (arriba a la izquierda) → **Conectar con Twitch**.
+2. La app muestra un **código**. Andá a **https://www.twitch.tv/activate**, ingresalo y autorizá
    (te pide permiso `channel:read:redemptions` para leer tus canjes).
-5. El panel cambia a **✓ Conectado como `<tu usuario>`**. Listo.
+3. El panel cambia a **✓ Conectado como `<tu usuario>`**. Listo.
 
-El token queda guardado (`twitch.json`, local a tu máquina), así que **la próxima vez se reconecta solo**.
+El token queda guardado local a tu máquina, así que **la próxima vez se reconecta solo**.
 A partir de acá, cada canje de Channel Points dispara el video correspondiente automáticamente.
+
+> **Avanzado:** podés usar tu propia Twitch App (Client Type *Public*) con el botón
+> "Usar mi propio Client ID". Normalmente no hace falta — la app trae uno compartido.
 
 ---
 
@@ -112,26 +91,11 @@ revisá que el Browser Source apunte a `http://localhost:3001/overlay` y que la 
 
 ---
 
-## Modo Streamer.bot (opcional)
-
-Si preferís usar Streamer.bot en vez del modo standalone, el endpoint HTTP sigue activo:
-
-1. Creá una **Action** con un sub-action **Fetch URL** (HTTP GET) a:
-   ```
-   http://localhost:3001/api/trigger?reward=%rewardName%&user=%userName%
-   ```
-2. **Trigger:** Twitch → Channel Point Reward Redemption (sin filtro de reward).
-
-La Fetch URL está disponible para copiar en el footer del panel de control.
-
----
-
 ## Troubleshooting
 
 | Problema | Qué revisar |
 |----------|-------------|
-| El panel Twitch pide Client ID de nuevo | Asegurate de haber guardado el Client ID y de que la Twitch App sea **Public** |
-| "Suscripción rechazada" | El Client ID debe ser de una app **Public** y autorizaste con tu cuenta de broadcaster |
+| "Suscripción rechazada" | Autorizá con tu cuenta de broadcaster (la que tiene los Channel Points) |
 | El canje no dispara video | El nombre del reward en el panel debe ser **idéntico** al de Twitch (mayúsculas incluidas) |
 | "Sin overlay conectado" al probar | El Browser Source debe apuntar a `http://localhost:3001/overlay` y la app estar abierta |
 | Video no aparece | Verificá que el archivo exista en `videos/` (el panel marca ⚠ si falta) |

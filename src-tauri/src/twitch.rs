@@ -1,12 +1,10 @@
-//! Direct Twitch integration so the app runs standalone (no Streamer.bot).
+//! Direct Twitch integration — the app connects to Twitch on its own.
 //!
 //! Flow:
 //!   1. OAuth Device Code Flow → obtain a user access token (`channel:read:redemptions`).
 //!   2. EventSub WebSocket → subscribe to channel point redemptions.
-//!   3. On each redemption → broadcast the same `playVideo` message the overlay
-//!      already understands (identical contract to `/api/trigger`).
-//!
-//! Streamer.bot stays optional: `/api/trigger` keeps working in parallel.
+//!   3. On each redemption → broadcast a `playVideo` message to every connected
+//!      overlay (via `broadcast_play_video`, same path as the "Probar" button).
 
 use crate::AppState;
 use futures_util::{SinkExt, StreamExt};
@@ -17,6 +15,18 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
+
+/// Shared "Stream Overlay by h0kd" Twitch App (Public client). The Client ID is
+/// NOT a secret in the Device Code Flow, so it's safe to ship embedded — this is
+/// what lets any streamer connect without registering their own Twitch App.
+/// Advanced users can still override it (stored per-machine in twitch.json).
+const DEFAULT_CLIENT_ID: &str = "zwq84d8wq9lrkvgg3pb1pwe26s8794";
+
+/// The Client ID to actually use: the user's own if set, otherwise the shared one.
+fn effective_client_id(saved: &str) -> String {
+    let s = saved.trim();
+    if s.is_empty() { DEFAULT_CLIENT_ID.to_string() } else { s.to_string() }
+}
 
 const SCOPES: &str = "channel:read:redemptions";
 const DEVICE_URL: &str = "https://id.twitch.tv/oauth2/device";
@@ -34,6 +44,9 @@ pub struct TwitchStatus {
     pub state: String,
     #[serde(rename = "clientId")]
     pub client_id: Option<String>,
+    /// True when using the shared embedded Client ID (no user override set).
+    #[serde(rename = "usingDefault")]
+    pub using_default: bool,
     #[serde(rename = "userCode")]
     pub user_code: Option<String>,
     #[serde(rename = "verificationUri")]
@@ -47,6 +60,7 @@ impl Default for TwitchStatus {
         TwitchStatus {
             state: "disconnected".into(),
             client_id: None,
+            using_default: true,
             user_code: None,
             verification_uri: None,
             login: None,
@@ -134,11 +148,13 @@ pub async fn worker_loop(state: AppState, mut rx: mpsc::Receiver<TwitchCmd>) {
     let data_dir = state.data_dir.clone();
     let mut handle: Option<tokio::task::JoinHandle<()>> = None;
 
-    // Restore saved client id; auto-connect if we already have a token.
+    // Report the effective client id (user's own, or the shared default) so the
+    // UI skips the "register a Twitch App" step and goes straight to Connect.
     let saved = load_tokens(&data_dir);
-    if !saved.client_id.is_empty() {
-        update_status(&shared, |s| s.client_id = Some(saved.client_id.clone()));
-    }
+    update_status(&shared, |s| {
+        s.client_id = Some(effective_client_id(&saved.client_id));
+        s.using_default = saved.client_id.trim().is_empty();
+    });
     if !saved.access_token.is_empty() {
         handle = Some(tokio::spawn(session(state.clone())));
     }
@@ -149,7 +165,11 @@ pub async fn worker_loop(state: AppState, mut rx: mpsc::Receiver<TwitchCmd>) {
                 let mut tok = load_tokens(&data_dir);
                 tok.client_id = id.clone();
                 save_tokens(&data_dir, &tok);
-                update_status(&shared, |s| s.client_id = Some(id));
+                // Empty input means "reset to the shared default".
+                update_status(&shared, |s| {
+                    s.client_id = Some(effective_client_id(&id));
+                    s.using_default = id.trim().is_empty();
+                });
             }
             TwitchCmd::Connect => {
                 if let Some(h) = handle.take() {
@@ -190,13 +210,8 @@ async fn session(state: AppState) {
     let client = reqwest::Client::new();
 
     let mut tokens = load_tokens(&data_dir);
-    if tokens.client_id.is_empty() {
-        update_status(&shared, |s| {
-            s.state = "error".into();
-            s.error = Some("Falta el Client ID de la Twitch App.".into());
-        });
-        return;
-    }
+    // Fall back to the shared Client ID when the user hasn't set their own.
+    tokens.client_id = effective_client_id(&tokens.client_id);
 
     // Run the device flow when there is no usable access token yet.
     if tokens.access_token.is_empty() {

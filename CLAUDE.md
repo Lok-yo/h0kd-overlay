@@ -3,18 +3,25 @@
 Reemplazo self-hosted de TriggerFyre para disparar videos en un overlay de OBS
 cuando viewers canjean Channel Points en Twitch.
 
-## Arquitectura (MVP local)
+## Arquitectura (standalone — Tauri)
 
 ```
-Twitch → Streamer.bot → WebSocket (8080) → overlay.html (OBS Browser Source)
-                                                  ↓
-                                           config.json + videos/
+Twitch EventSub ─┐
+                 ├─► app Rust (src-tauri) ─► WebSocket :3001 ─► overlay.html (OBS Browser Source)
+panel "Probar" ──┘            │
+                              └─► config.json + videos/  (dir de datos del usuario)
 ```
 
-- **overlay.html** — todo el código vive acá (HTML + CSS + JS inline). Sin build step.
-- **config.json** — mapeo `rewardName → { videos, width, height, volume, ... }`.
-- **videos/** — archivos .mp4 / .webm locales. Ignorados en git.
-- **mock-ws-server.js** — servidor WS de prueba (requiere `npm install ws`).
+La app se conecta **directo a Twitch** vía EventSub (OAuth Device Code Flow, ver `twitch.rs`).
+No hay Streamer.bot ni dependencias de programas externos.
+
+- **src-tauri/src/lib.rs** — comandos Tauri + arranque + `find_data_dir`.
+- **src-tauri/src/server.rs** — server axum (HTTP + WebSocket) en `:3001`.
+- **src-tauri/src/twitch.rs** — Device Code Flow + cliente EventSub. Client ID compartido embebido.
+- **src/control.html** — panel de control nativo (HTML+CSS+JS inline, sin build step).
+- **src/overlay.html** — overlay servido en `/overlay` (embebido vía `include_str!`).
+- **config.json + videos/** — en el dir de datos del SO (`%APPDATA%` / `~/Library/Application Support`),
+  auto-creados en el primer arranque. En dev usa el `config.json` del repo. Ignorados en git.
 
 ## Convenciones
 
@@ -24,30 +31,19 @@ Twitch → Streamer.bot → WebSocket (8080) → overlay.html (OBS Browser Sourc
 - Sin dependencias externas. Single-file mientras quepa <500 líneas.
 - Commits: Conventional Commits en inglés.
 
-## WebSocket protocol (Streamer.bot)
+## WebSocket protocol (overlay)
 
-Mensajes de entrada:
+El backend emite a cada overlay conectado (mismo contrato que produce `broadcast_play_video`):
 ```json
 {
   "event": { "source": "General", "type": "Custom" },
   "data":  { "action": "playVideo", "reward": "<name>", "user": "<name>" }
 }
 ```
-Subscribe on connect:
-```json
-{ "request": "Subscribe", "id": "overlay-sub-1", "events": { "General": ["Custom"] } }
-```
+También `{ "data": { "action": "reloadConfig" } }` para recargar config en caliente al guardar.
 
 ## Testing manual
 
-Consola de DevTools (Browser Source → Interact → F12):
-- `spawnVideo("nombre del reward")` — spawnea sin Streamer.bot ni Twitch.
-- Tecla `R` — hot-reload de config.json sin refrescar el Browser Source.
-
-Servidor mock: `npm install ws && node mock-ws-server.js`
-
-## Non-goals del MVP
-
-- Dashboard admin, backend, persistencia, autenticación.
-- Cola con prioridades, combos, efectos de raid.
-- Cloudflare / D1 / R2 (eso es Etapa 2).
+Consola de DevTools del overlay (Browser Source → Interact → F12):
+- `spawnVideo("nombre del reward")` — spawnea sin Twitch.
+- Botón **Probar** en el panel — dispara un reward al overlay conectado.

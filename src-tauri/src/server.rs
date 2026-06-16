@@ -2,7 +2,7 @@ use crate::AppState;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Query, State,
+        State,
     },
     http::{header, StatusCode},
     response::{Html, IntoResponse, Response},
@@ -10,7 +10,6 @@ use axum::{
     Json, Router,
 };
 use futures_util::{SinkExt, StreamExt};
-use serde::Deserialize;
 use serde_json::json;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
@@ -27,7 +26,6 @@ pub async fn start(state: AppState) -> std::io::Result<()> {
         .route("/config.json", get(serve_config_json))
         .route("/api/config", get(get_config_handler).post(post_config_handler))
         .route("/api/videos", get(list_videos_handler))
-        .route("/api/trigger", get(trigger_get).post(trigger_post))
         .nest_service("/videos", ServeDir::new(videos_dir))
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -35,7 +33,6 @@ pub async fn start(state: AppState) -> std::io::Result<()> {
     let listener = tokio::net::TcpListener::bind(SERVER_BIND).await?;
     println!("[Server] Listening on http://{}", SERVER_BIND);
     println!("[Server] Overlay (OBS) → http://{}/overlay", SERVER_BIND);
-    println!("[Server] Trigger (S.bot) → http://{}/api/trigger", SERVER_BIND);
 
     axum::serve(listener, app)
         .await
@@ -58,7 +55,6 @@ async fn root_handler(State(state): State<AppState>, ws: Option<WebSocketUpgrade
             <p>El servidor está corriendo. Endpoints:</p>
             <ul>
               <li><a href="/overlay" style="color:#9147ff">/overlay</a> — pegar en OBS Browser Source</li>
-              <li><code>/api/trigger?reward=NAME&amp;user=NAME</code> — Streamer.bot</li>
             </ul>
             <p>El panel de control está en la ventana principal de la app.</p>
             </body>"#,
@@ -186,53 +182,5 @@ async fn list_videos_handler(State(state): State<AppState>) -> Response {
     }
     files.sort();
     Json(files).into_response()
-}
-
-// ── /api/trigger ────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
-struct TriggerParams {
-    reward: Option<String>,
-    user: Option<String>,
-}
-
-async fn trigger_get(
-    State(state): State<AppState>,
-    Query(params): Query<TriggerParams>,
-) -> Response {
-    handle_trigger(&state, params.reward, params.user)
-}
-
-async fn trigger_post(
-    State(state): State<AppState>,
-    body: Option<Json<TriggerParams>>,
-) -> Response {
-    let (r, u) = match body {
-        Some(Json(p)) => (p.reward, p.user),
-        None => (None, None),
-    };
-    handle_trigger(&state, r, u)
-}
-
-fn handle_trigger(state: &AppState, reward: Option<String>, user: Option<String>) -> Response {
-    let reward = match reward.filter(|r| !r.is_empty()) {
-        Some(r) => r,
-        None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "missing reward" })),
-            )
-                .into_response();
-        }
-    };
-    let user = user.unwrap_or_default();
-    let msg = json!({
-        "event": { "source": "General", "type": "Custom" },
-        "data": { "action": "playVideo", "reward": reward, "user": user }
-    })
-    .to_string();
-    let clients = state.tx.send(msg).unwrap_or(0);
-    println!("[Trigger] playVideo → {} | clientes: {}", reward, clients);
-    Json(json!({ "ok": true, "clients": clients })).into_response()
 }
 

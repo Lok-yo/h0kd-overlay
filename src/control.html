@@ -586,7 +586,6 @@
   <span id="connText">Servidor: <code id="serverUrl" title="Click para copiar">http://localhost:3001</code></span>
   <span style="flex:1"></span>
   <span>OBS Browser Source: <code id="overlayUrl" title="Click para copiar">http://localhost:3001/overlay</code></span>
-  <span>Streamer.bot Fetch URL (opcional): <code id="triggerUrl" title="Click para copiar">http://localhost:3001/api/trigger?reward=%rewardName%&amp;user=%userName%</code></span>
 </footer>
 
 <script>
@@ -664,7 +663,7 @@
     });
 
     // Click-to-copy URLs in footer
-    ['serverUrl', 'overlayUrl', 'triggerUrl'].forEach(function(id) {
+    ['serverUrl', 'overlayUrl'].forEach(function(id) {
       var el = document.getElementById(id);
       el.addEventListener('click', function() {
         var text = el.textContent;
@@ -698,9 +697,10 @@
     } catch (_) {}
   }
 
-  // ── Twitch (modo standalone, sin Streamer.bot) ─────────────────────────────
+  // ── Twitch (conexión directa por EventSub) ─────────────────────────────────
 
   var twLastSig = '';
+  var twAdvanced = false;   // show the "use my own Client ID" form
 
   async function pollTwitch() {
     var st;
@@ -722,19 +722,22 @@
       : state === 'pairing' || state === 'connecting' ? ' warn'
       : state === 'error' ? ' err' : '');
 
-    // 1) Falta el Client ID → pedirlo.
-    if (!st.clientId) {
+    // 1) Avanzado: usar un Client ID propio (normalmente no hace falta).
+    if (twAdvanced || !st.clientId) {
       body.innerHTML =
-        '<p>Para correr sin Streamer.bot, registrá una app en '
-        + '<a href="https://dev.twitch.tv/console/apps" target="_blank">dev.twitch.tv</a> '
-        + '(Client Type: <b>Public</b>, OAuth Redirect: <code>http://localhost</code>) y pegá el Client ID:</p>'
-        + '<input class="tw-input" id="twClientId" placeholder="Client ID" />'
-        + '<button class="tw-btn" id="twSaveId">Guardar Client ID</button>';
+        '<p>Avanzado: usá tu propia Twitch App (Client Type <b>Public</b>, OAuth Redirect '
+        + '<code>https://localhost</code>). Dejalo vacío para usar la app compartida.</p>'
+        + '<input class="tw-input" id="twClientId" placeholder="Tu Client ID" value="'
+        + esc(st.usingDefault ? '' : (st.clientId || '')) + '" />'
+        + '<button class="tw-btn" id="twSaveId">Guardar</button>'
+        + '<button class="tw-btn secondary" id="twCancelAdv">Cancelar</button>';
       document.getElementById('twSaveId').addEventListener('click', async function() {
-        var id = document.getElementById('twClientId').value.trim();
-        if (!id) return;
-        try { await invoke('twitch_set_client_id', { clientId: id }); twLastSig = ''; pollTwitch(); }
+        var id = document.getElementById('twClientId').value.trim();   // '' = volver a la compartida
+        try { await invoke('twitch_set_client_id', { clientId: id }); twAdvanced = false; twLastSig = ''; pollTwitch(); }
         catch (e) { alert('Error: ' + e); }
+      });
+      document.getElementById('twCancelAdv').addEventListener('click', function() {
+        twAdvanced = false; twLastSig = ''; pollTwitch();
       });
       return;
     }
@@ -764,25 +767,31 @@
     if (state === 'connected') {
       body.innerHTML =
         '<p class="tw-line">' + ICON.check + ' Conectado como <b>' + esc(st.login || '—') + '</b>. '
-        + 'Los canjes disparan videos directo, sin Streamer.bot.</p>'
+        + 'Los canjes de Channel Points disparan los videos automáticamente.</p>'
         + '<button class="tw-btn secondary" id="twDisc">Desconectar</button>';
       document.getElementById('twDisc').addEventListener('click', twDisconnect);
       return;
     }
 
     // 5) Error / desconectado.
-    body.innerHTML =
-      (state === 'error' && st.error ? '<p class="tw-error">' + ICON.warn + ' ' + esc(st.error) + '</p>' : '')
-      + '<p class="tw-line">Client ID: <b>' + esc(st.clientId.slice(0, 8)) + '…</b></p>'
-      + '<button class="tw-btn" id="twConnect">Conectar con Twitch</button>'
-      + '<button class="tw-btn secondary" id="twChangeId">Cambiar Client ID</button>';
+    var head = (state === 'error' && st.error ? '<p class="tw-error">' + ICON.warn + ' ' + esc(st.error) + '</p>' : '');
+    if (st.usingDefault) {
+      body.innerHTML = head
+        + '<p class="tw-line">Conectá tu cuenta de Twitch para que los canjes de Channel Points disparen los videos.</p>'
+        + '<button class="tw-btn" id="twConnect">Conectar con Twitch</button>'
+        + '<button class="tw-btn secondary" id="twAdv">Usar mi propio Client ID (avanzado)</button>';
+    } else {
+      body.innerHTML = head
+        + '<p class="tw-line">Client ID propio: <b>' + esc(st.clientId.slice(0, 8)) + '…</b></p>'
+        + '<button class="tw-btn" id="twConnect">Conectar con Twitch</button>'
+        + '<button class="tw-btn secondary" id="twAdv">Cambiar Client ID</button>';
+    }
     document.getElementById('twConnect').addEventListener('click', async function() {
       try { await invoke('twitch_connect'); twLastSig = ''; pollTwitch(); }
       catch (e) { alert('Error: ' + e); }
     });
-    document.getElementById('twChangeId').addEventListener('click', async function() {
-      try { await invoke('twitch_set_client_id', { clientId: '' }); twLastSig = ''; pollTwitch(); }
-      catch (e) { alert('Error: ' + e); }
+    document.getElementById('twAdv').addEventListener('click', function() {
+      twAdvanced = true; twLastSig = ''; pollTwitch();
     });
   }
 

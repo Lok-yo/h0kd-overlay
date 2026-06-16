@@ -2,7 +2,7 @@ mod server;
 mod twitch;
 
 use serde_json::{json, Value};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::sync::{broadcast, mpsc};
 use twitch::{TwitchCmd, TwitchStatus};
@@ -16,8 +16,8 @@ pub struct AppState {
 }
 
 /// Broadcast a `playVideo` event to every connected overlay.
-/// Single source of truth shared by the HTTP trigger, the admin "Probar"
-/// button, and the Twitch EventSub listener. Returns the number of overlays.
+/// Single source of truth shared by the admin "Probar" button and the Twitch
+/// EventSub listener. Returns the number of overlays reached.
 pub fn broadcast_play_video(tx: &broadcast::Sender<String>, reward: &str, user: &str) -> usize {
     let msg = json!({
         "event": { "source": "General", "type": "Custom" },
@@ -35,35 +35,80 @@ fn default_config() -> Value {
     })
 }
 
-fn find_data_dir() -> PathBuf {
-    // Search for config.json by walking up the ancestors of both the current
-    // working directory and the executable's directory. This covers `tauri dev`
-    // (cwd = src-tauri) as well as running the built exe directly, where the
-    // binary lives several levels deep under src-tauri/target/<profile>/.
-    let mut roots: Vec<PathBuf> = vec![];
-    if let Ok(cwd) = std::env::current_dir() {
-        roots.push(cwd);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(parent) = exe.parent() {
-            roots.push(parent.to_path_buf());
+/// Per-user OS application-data directory for the app's config + videos.
+/// Windows: %APPDATA%\Stream Overlay
+/// macOS:   ~/Library/Application Support/Stream Overlay
+/// Linux:   $XDG_DATA_HOME/Stream Overlay (or ~/.local/share/Stream Overlay)
+fn os_app_data_dir() -> PathBuf {
+    let base: PathBuf = if cfg!(target_os = "windows") {
+        std::env::var_os("APPDATA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."))
+    } else if cfg!(target_os = "macos") {
+        std::env::var_os("HOME")
+            .map(|h| PathBuf::from(h).join("Library/Application Support"))
+            .unwrap_or_else(|| PathBuf::from("."))
+    } else {
+        std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
+            .unwrap_or_else(|| PathBuf::from("."))
+    };
+    base.join("Stream Overlay")
+}
+
+/// Create the data dir + videos/ folder, and seed a default config.json the
+/// first time the app runs, so a freshly downloaded app works out of the box.
+fn ensure_data_dir(dir: &Path) {
+    let _ = std::fs::create_dir_all(dir.join("videos"));
+    let cfg = dir.join("config.json");
+    if !cfg.exists() {
+        if let Ok(pretty) = serde_json::to_string_pretty(&default_config()) {
+            let _ = std::fs::write(&cfg, pretty);
         }
     }
-    // Walk ancestors of each root, preserving order (cwd ancestors first).
-    for root in &roots {
-        for ancestor in root.ancestors() {
-            if ancestor.join("config.json").exists() {
-                println!("[Data] Found config.json at: {}", ancestor.display());
-                return ancestor.to_path_buf();
+}
+
+fn find_data_dir() -> PathBuf {
+    // Dev builds: use the repo's config.json (walk ancestors of cwd and the exe)
+    // so `cargo run` / `cargo tauri dev` iterate against the checked-in config.
+    #[cfg(debug_assertions)]
+    {
+        let mut roots: Vec<PathBuf> = vec![];
+        if let Ok(cwd) = std::env::current_dir() {
+            roots.push(cwd);
+        }
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(parent) = exe.parent() {
+                roots.push(parent.to_path_buf());
+            }
+        }
+        for root in &roots {
+            for ancestor in root.ancestors() {
+                if ancestor.join("config.json").exists() {
+                    println!("[Data] (dev) Found config.json at: {}", ancestor.display());
+                    return ancestor.to_path_buf();
+                }
             }
         }
     }
-    let fallback = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    println!(
-        "[Data] No config.json found in any ancestor. Using: {}",
-        fallback.display()
-    );
-    fallback
+
+    // Portable mode: a config.json sitting next to the executable takes priority,
+    // letting advanced users keep everything in one folder.
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            if parent.join("config.json").exists() {
+                println!("[Data] Portable: {}", parent.display());
+                return parent.to_path_buf();
+            }
+        }
+    }
+
+    // Default for distributed apps: per-user OS app-data dir, seeded on first run.
+    let dir = os_app_data_dir();
+    ensure_data_dir(&dir);
+    println!("[Data] Using app data dir: {}", dir.display());
+    dir
 }
 
 #[tauri::command]
@@ -120,7 +165,7 @@ fn trigger_reward(state: tauri::State<AppState>, reward: String, user: Option<St
     json!({ "ok": true, "clients": clients })
 }
 
-// ── Twitch (standalone mode — no Streamer.bot) ───────────────────────────────
+// ── Twitch (direct EventSub integration) ─────────────────────────────────────
 
 #[tauri::command]
 fn twitch_status(state: tauri::State<AppState>) -> TwitchStatus {
@@ -218,7 +263,7 @@ pub fn run() {
                     eprintln!("[Server] failed to start: {}", e);
                 }
             });
-            // Twitch EventSub worker: lets the app run without Streamer.bot.
+            // Twitch EventSub worker: connects to Twitch and broadcasts redemptions.
             let twitch_state = state.clone();
             tauri::async_runtime::spawn(twitch::worker_loop(twitch_state, twitch_rx));
             Ok(())
