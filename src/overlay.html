@@ -130,7 +130,14 @@
       const videos = rc.videos;
       if (!videos || videos.length === 0) { warn(`No videos for reward: "${rewardName}"`); return; }
 
-      const src            = videos[Math.floor(Math.random() * videos.length)];
+      // playback mode: "all" spawns every video at once, otherwise pick 1 at random.
+      const playAll = rc.playback === 'all';
+      const chosen  = playAll ? videos.slice() : [videos[Math.floor(Math.random() * videos.length)]];
+      log(`Spawning "${rewardName}" (${playAll ? 'all' : 'random'}) → ${chosen.length} video(s)`);
+      chosen.forEach(src => spawnOne(rewardName, rc, src));
+    }
+
+    function spawnOne(rewardName, rc, src) {
       const width          = rc.width       || 480;
       const height         = rc.height      || 270;
       const volume         = rc.volume      !== undefined ? Math.min(1, Math.max(0, rc.volume)) : 1.0;
@@ -138,7 +145,7 @@
       const respectZones   = rc.respectSafeZones !== false;
 
       const { x, y } = randomPosition(width, height, respectZones);
-      log(`Spawning "${rewardName}" → ${src}  vol=${volume}  pos=(${x},${y})`);
+      log(`  → ${src}  vol=${volume}  pos=(${x},${y})`);
 
       const wrapper = document.createElement('div');
       wrapper.className = 'video-spawn';

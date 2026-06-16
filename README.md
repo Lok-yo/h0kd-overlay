@@ -71,14 +71,17 @@ A partir de acá, cada canje de Channel Points dispara el video correspondiente 
 2. En el panel de control → **Rewards** → **+ Nuevo**. Configurá:
    - **Nombre del reward:** debe coincidir **exactamente** con el título del reward en Twitch
      (mayúsculas incluidas — Twitch manda el `reward.title`).
-   - **Videos:** elegí uno o más de la carpeta `videos/`. Si hay varios, se elige uno al azar por canje.
+   - **Videos:** elegí uno o más de la carpeta `videos/`.
+   - **Modo de reproducción** (cuando hay varios videos):
+     - *Aleatorio* (por defecto): se reproduce **1 al azar** por canje.
+     - *Todos a la vez*: se reproducen **todos** juntos, cada uno en su propia posición aleatoria.
    - **Volumen**, **ancho/alto** (caja máxima — el video mantiene su aspect ratio), **duración máxima**.
    - **Respetar safe zones** (que el video no aparezca sobre tu webcam, etc.).
 3. **Safe Zones:** definí rectángulos (x, y, ancho, alto) donde los videos no deben aparecer.
 4. **Canvas:** la resolución de tu escena (por defecto 1920×1080).
 5. Click **Guardar config.json**.
 
-> También podés editar `config.json` a mano (botón **📁 Carpeta** abre la ubicación).
+> También podés editar `config.json` a mano (el botón **Carpeta** abre la ubicación).
 
 ---
 

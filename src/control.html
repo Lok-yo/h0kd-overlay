@@ -1032,6 +1032,14 @@
       + '</div>'
 
       + '<div class="field">'
+        + '<label>Modo de reproducción (con varios videos)</label>'
+        + '<select id="ri-playback">'
+          + '<option value="random"' + (rc.playback === 'all' ? '' : ' selected') + '>Aleatorio — reproduce 1 al azar por canje</option>'
+          + '<option value="all"' + (rc.playback === 'all' ? ' selected' : '') + '>Todos a la vez — reproduce los ' + (rc.videos || []).length + ' videos juntos</option>'
+        + '</select>'
+      + '</div>'
+
+      + '<div class="field">'
         + '<label>Volumen</label>'
         + '<div class="vol-row">'
           + '<input type="range" id="ri-vol" min="0" max="1" step="0.01" value="' + volVal + '" />'
@@ -1085,6 +1093,11 @@
     });
 
     setupSizePreview(name);
+
+    document.getElementById('ri-playback').addEventListener('change', function() {
+      cfg.rewards[name].playback = this.value;
+      markDirty();
+    });
 
     document.getElementById('ri-dur').addEventListener('input', function() {
       cfg.rewards[name].maxDuration = parseInt(this.value) || 10000;
@@ -1288,7 +1301,7 @@
     var name = base;
     var n = 1;
     while (cfg.rewards[name]) name = base + ' ' + (++n);
-    cfg.rewards[name] = { videos: [], width: 480, height: 270, volume: 0.8, maxDuration: 10000, respectSafeZones: true };
+    cfg.rewards[name] = { videos: [], width: 480, height: 270, volume: 0.8, maxDuration: 10000, respectSafeZones: true, playback: 'random' };
     markDirty();
     renderRewardsList();
     selectReward(name);
