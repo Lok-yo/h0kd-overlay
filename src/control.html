@@ -507,6 +507,17 @@
   .tw-line { font-size: 12px; }
   .tw-line b { color: var(--text); }
   .tw-error { color: var(--danger); font-size: 12px; }
+  .tw-account { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .tw-avatar {
+    width: 42px; height: 42px; border-radius: 50%; flex: none;
+    background: var(--s2); object-fit: cover;
+  }
+  .tw-account-info b { display: block; font-size: 14px; color: var(--text); line-height: 1.2; }
+  .tw-online { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--green); }
+  .tw-online i {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 5px var(--green); display: inline-block;
+  }
   .conn-dot.warn { background: #f0a000; box-shadow: 0 0 6px #f0a000; }
   .conn-dot.err  { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
 
@@ -878,9 +889,17 @@
 
     // 4) Conectado.
     if (state === 'connected') {
+      var avatar = st.avatar
+        ? '<img class="tw-avatar" src="' + esc(st.avatar) + '" alt="" onerror="this.remove()" />'
+        : '';
       body.innerHTML =
-        '<p class="tw-line">' + ICON.check + ' Conectado como <b>' + esc(st.login || '—') + '</b>. '
-        + 'Los canjes de Channel Points disparan los videos automáticamente.</p>'
+        '<div class="tw-account">'
+          + avatar
+          + '<div class="tw-account-info">'
+            + '<b>' + esc(st.displayName || st.login || '—') + '</b>'
+            + '<span class="tw-online"><i></i>Conectado</span>'
+          + '</div>'
+        + '</div>'
         + '<button class="tw-btn secondary" id="twDisc">Desconectar</button>';
       document.getElementById('twDisc').addEventListener('click', twDisconnect);
       return;

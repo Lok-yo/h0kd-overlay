@@ -52,6 +52,9 @@ pub struct TwitchStatus {
     #[serde(rename = "verificationUri")]
     pub verification_uri: Option<String>,
     pub login: Option<String>,
+    #[serde(rename = "displayName")]
+    pub display_name: Option<String>,
+    pub avatar: Option<String>,
     pub error: Option<String>,
 }
 
@@ -64,6 +67,8 @@ impl Default for TwitchStatus {
             user_code: None,
             verification_uri: None,
             login: None,
+            display_name: None,
+            avatar: None,
             error: None,
         }
     }
@@ -194,6 +199,8 @@ pub async fn worker_loop(state: AppState, mut rx: mpsc::Receiver<TwitchCmd>) {
                     s.user_code = None;
                     s.verification_uri = None;
                     s.login = None;
+                    s.display_name = None;
+                    s.avatar = None;
                     s.error = None;
                 });
                 println!("[Twitch] Desconectado.");
@@ -249,6 +256,8 @@ async fn session(state: AppState) {
                     update_status(&shared, |s| {
                         s.state = "error".into();
                         s.login = None;
+                        s.display_name = None;
+                        s.avatar = None;
                         s.error = Some("Sesión expirada. Reconectá con Twitch.".into());
                     });
                     // Drop the dead token so the next Connect runs the device flow.
@@ -269,6 +278,8 @@ async fn session(state: AppState) {
                         update_status(&shared, |s| {
                             s.state = "error".into();
                             s.login = None;
+                            s.display_name = None;
+                            s.avatar = None;
                             s.error = Some(format!("No se pudo renovar el token: {e}"));
                         });
                         tokens.access_token.clear();
@@ -386,11 +397,18 @@ async fn refresh(
 
 // ── Helix: resolve the authenticated user (broadcaster) ──────────────────────
 
+struct Broadcaster {
+    id: String,
+    login: String,
+    display_name: String,
+    avatar: String,
+}
+
 async fn get_broadcaster(
     client: &reqwest::Client,
     client_id: &str,
     access_token: &str,
-) -> Result<(String, String), SessionError> {
+) -> Result<Broadcaster, SessionError> {
     let resp = client
         .get(HELIX_USERS)
         .header("Client-Id", client_id)
@@ -417,17 +435,18 @@ async fn get_broadcaster(
         .get("data")
         .and_then(|d| d.get(0))
         .ok_or_else(|| SessionError::Fatal("Respuesta de /users vacía".into()))?;
+    let str_field = |k: &str| user.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
     let id = user
         .get("id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| SessionError::Fatal("Sin user id".into()))?
         .to_string();
-    let login = user
-        .get("login")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    Ok((id, login))
+    Ok(Broadcaster {
+        id,
+        login: str_field("login"),
+        display_name: str_field("display_name"),
+        avatar: str_field("profile_image_url"),
+    })
 }
 
 // ── EventSub: one WebSocket connection, processed until it drops ─────────────
@@ -439,8 +458,9 @@ async fn run_eventsub(
 ) -> Result<(), SessionError> {
     let shared = state.twitch.clone();
 
-    let (broadcaster_id, login) =
-        get_broadcaster(client, &tokens.client_id, &tokens.access_token).await?;
+    let bc = get_broadcaster(client, &tokens.client_id, &tokens.access_token).await?;
+    let broadcaster_id = bc.id.clone();
+    let login = bc.login.clone();
 
     let (ws_stream, _) = tokio_tungstenite::connect_async(EVENTSUB_WS)
         .await
@@ -503,6 +523,12 @@ async fn run_eventsub(
     update_status(&shared, |s| {
         s.state = "connected".into();
         s.login = if login.is_empty() { None } else { Some(login.clone()) };
+        s.display_name = Some(if bc.display_name.is_empty() {
+            login.clone()
+        } else {
+            bc.display_name.clone()
+        });
+        s.avatar = if bc.avatar.is_empty() { None } else { Some(bc.avatar.clone()) };
         s.user_code = None;
         s.verification_uri = None;
         s.error = None;
