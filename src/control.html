@@ -234,8 +234,8 @@
     border-color: var(--accent);
   }
   .ri-twitch-link {
-    width: 100%; margin-top: 8px; padding: 7px 10px; font-size: 12px;
-    background: var(--s2); border: 1px solid var(--border); border-radius: 6px; color: var(--muted);
+    width: 100%; padding: 8px 12px; font-size: 13px;
+    background: var(--s2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
   }
   .inline-row { display: flex; gap: 12px; }
   .inline-row .field { flex: 1; }
@@ -1171,17 +1171,30 @@
     document.getElementById('editorForm').style.display = 'none';
   }
 
-  // Dropdown to link a reward to one of the channel's Twitch Channel Points
-  // (picks the exact title — no typos). Hidden until rewards are loaded.
-  function twitchLinkSelect(name) {
-    if (!twitchRewards.length) return '';
-    var opts = twitchRewards.map(function(r) {
-      var sels = (r.title === name) ? ' selected' : '';
-      return '<option value="' + esc(r.title) + '"' + sels + '>' + esc(r.title) + '</option>';
-    }).join('');
-    return '<select id="ri-twitch-link" class="ri-twitch-link">'
-      + '<option value="">— Vincular a un reward de tu Twitch —</option>'
-      + opts + '</select>';
+  // The reward's identity field. When connected, it's a dropdown of the
+  // channel's Twitch Channel Points (picking one sets the exact name — no
+  // typos). When not connected, it falls back to a manual text input.
+  function nameFieldHtml(name) {
+    if (twitchRewards.length) {
+      var matched = twitchRewards.some(function(r) { return r.title === name; });
+      var opts = twitchRewards.map(function(r) {
+        return '<option value="' + esc(r.title) + '"' + (r.title === name ? ' selected' : '')
+          + '>' + esc(r.title) + '</option>';
+      }).join('');
+      return '<div class="field">'
+        + '<label>Reward de Twitch</label>'
+        + '<select id="ri-twitch-link" class="ri-twitch-link">'
+          + '<option value=""' + (matched ? '' : ' selected') + '>— Elegí tu reward de Twitch —</option>'
+          + opts
+        + '</select>'
+        + (matched ? '' : '<div class="size-hint">Elegí a qué reward de Channel Points se vincula.</div>')
+      + '</div>';
+    }
+    return '<div class="field">'
+      + '<label>Nombre del reward</label>'
+      + '<input type="text" id="ri-name" value="' + esc(name) + '" />'
+      + '<div class="size-hint">Conectá tu Twitch para elegirlo de una lista.</div>'
+    + '</div>';
   }
 
   function renderEditor(name) {
@@ -1210,11 +1223,7 @@
     if (!videoOptions) videoOptions = '<option value="">— Carpeta videos/ vacía —</option>';
 
     form.innerHTML =
-      '<div class="field">'
-        + '<label>Nombre del reward (debe coincidir exactamente con Twitch)</label>'
-        + '<input type="text" id="ri-name" value="' + esc(name) + '" />'
-        + twitchLinkSelect(name)
-      + '</div>'
+      nameFieldHtml(name)
 
       + '<div class="field">'
         + '<label>Videos</label>'
@@ -1278,13 +1287,14 @@
         + '<button class="danger-btn" id="deleteRewardBtn">Eliminar reward</button>'
       + '</div>';
 
-    document.getElementById('ri-name').addEventListener('change', function() {
+    var nameInput = document.getElementById('ri-name');   // only present when not connected
+    if (nameInput) nameInput.addEventListener('change', function() {
       var newName = this.value.trim();
       if (!newName || newName === name) return;
       renameReward(name, newName);
     });
 
-    var linkSel = document.getElementById('ri-twitch-link');
+    var linkSel = document.getElementById('ri-twitch-link');   // present when connected
     if (linkSel) linkSel.addEventListener('change', function() {
       var title = this.value;   // exact Twitch reward title
       if (!title || title === name) return;
