@@ -152,17 +152,41 @@ async fn twitch_disconnect(state: tauri::State<'_, AppState>) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
+/// Name of the OS utility that opens a file/URL with the default handler.
+fn os_opener() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        "explorer"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "open"
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        "xdg-open"
+    }
+}
+
 #[tauri::command]
 fn open_data_dir(state: tauri::State<AppState>) -> Result<(), String> {
-    let path = state.data_dir.as_path();
-    #[cfg(target_os = "windows")]
-    let program = "explorer";
-    #[cfg(target_os = "macos")]
-    let program = "open";
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let program = "xdg-open";
-    std::process::Command::new(program)
-        .arg(path)
+    std::process::Command::new(os_opener())
+        .arg(state.data_dir.as_path())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Open an external URL in the system's default browser. Webview `<a target="_blank">`
+/// links don't reach the OS browser, so the frontend routes clicks through this.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    // Only allow web URLs; never hand arbitrary strings to the OS opener.
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("only http(s) URLs are allowed".into());
+    }
+    std::process::Command::new(os_opener())
+        .arg(&url)
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -205,6 +229,7 @@ pub fn run() {
             list_videos,
             trigger_reward,
             open_data_dir,
+            open_url,
             twitch_status,
             twitch_set_client_id,
             twitch_connect,

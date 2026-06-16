@@ -14,7 +14,7 @@ Es una app de escritorio (Tauri) con un **panel de control nativo**. Se puede us
 
 ## Requisitos
 
-- **Windows** (la app se distribuye como `.exe`)
+- **Windows** (`.exe` / instalador) o **macOS** (`.app` / `.dmg`)
 - **OBS Studio** (con Browser Source)
 - Una **Twitch Application** propia (Client ID) — gratis, se crea una sola vez (ver más abajo)
 - Videos en formato `.mp4` (H.264 + AAC) o `.webm` (VP9 + Opus)
@@ -136,13 +136,32 @@ La Fetch URL está disponible para copiar en el footer del panel de control.
 
 ## Para desarrolladores
 
-```bash
-# Correr en modo dev (requiere Rust + Tauri CLI + VS Build Tools)
-cargo tauri dev
+Multiplataforma: se desarrolla y compila tanto en **Windows** como en **macOS**.
 
-# Generar el .exe + instalador
-cargo tauri build
+**Requisitos comunes:** [Rust](https://rustup.rs) y el Tauri CLI:
+
+```bash
+cargo install tauri-cli --version "^2"   # provee `cargo tauri`
 ```
+
+- **Windows:** Microsoft C++ Build Tools (o Visual Studio con "Desktop development with C++") + WebView2 (viene con Windows 10/11).
+- **macOS:** Xcode Command Line Tools (`xcode-select --install`). WebKit viene con el sistema.
+
+```bash
+cd src-tauri
+
+# Correr en modo dev (abre el panel + server en :3001)
+cargo tauri dev      # o, sin el CLI: cargo run
+
+# Generar bundles para el SO actual
+cargo tauri build
+#   Windows → src-tauri/target/release/bundle/{nsis,msi}/
+#   macOS   → src-tauri/target/release/bundle/{macos/*.app, dmg/*.dmg}
+```
+
+> Cada plataforma genera **solo** sus propios instaladores (no hay cross-compile).
+> En macOS los bundles no van firmados/notarizados: para uso local andan; al
+> compartirlos, la primera vez se abren con click derecho → **Abrir**.
 
 Estructura:
 

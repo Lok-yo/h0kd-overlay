@@ -582,6 +582,17 @@
   const invoke = (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
     || function() { return Promise.reject(new Error('Tauri no disponible')); };
 
+  // External links (target="_blank") don't reach the system browser from inside
+  // the webview. Route every such click through the Rust `open_url` command.
+  document.addEventListener('click', function(e) {
+    var a = e.target.closest && e.target.closest('a[target="_blank"]');
+    if (!a) return;
+    var href = a.getAttribute('href') || '';
+    if (!/^https?:\/\//.test(href)) return;
+    e.preventDefault();
+    invoke('open_url', { url: href }).catch(function(err) { alert('Error: ' + err); });
+  });
+
   var cfg     = {};
   var videos  = [];
   var sel     = null;   // reward name currently selected
