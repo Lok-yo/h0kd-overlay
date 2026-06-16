@@ -44,6 +44,11 @@
   }
   header h1 { font-size: 15px; font-weight: 700; flex: 1; }
   header h1 span { color: var(--accent); }
+  .app-icon {
+    width: 26px; height: 26px; border-radius: 6px; flex: none;
+    cursor: pointer; transition: transform .15s;
+  }
+  .app-icon:hover { transform: scale(1.12); }
   #statusBadge {
     font-size: 12px;
     padding: 3px 10px;
@@ -508,11 +513,78 @@
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Onboarding ── */
+  .onb-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.65);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .onb-overlay:not(.open) { display: none; }
+  .onb-overlay.open    { animation: onbFadeIn .18s ease; }
+  .onb-overlay.open .onb-card { animation: onbCardIn .24s cubic-bezier(.2,.8,.3,1); }
+  .onb-overlay.closing { animation: onbFadeOut .2s ease forwards; }
+  .onb-overlay.closing .onb-card { animation: onbCardOut .2s ease forwards; }
+  @keyframes onbFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes onbFadeOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes onbCardIn  { from { opacity: 0; transform: translateY(10px) scale(.95); } to { opacity: 1; transform: none; } }
+  @keyframes onbCardOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(10px) scale(.95); } }
+  .onb-card {
+    background: var(--s1); border: 1px solid var(--border); border-radius: 14px;
+    width: 470px; max-width: 100%; max-height: 100%; overflow: auto;
+    padding: 28px; text-align: center;
+  }
+  .onb-oc { width: 112px; height: 112px; border-radius: 14px; margin-bottom: 6px; }
+  .onb-card h2 { font-size: 20px; font-weight: 800; margin: 4px 0 4px; }
+  .onb-card h2 span { color: var(--accent); }
+  .onb-sub { color: var(--muted); font-size: 13px; margin: 0 0 20px; line-height: 1.45; }
+  .onb-steps { text-align: left; display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
+  .onb-step { display: flex; gap: 12px; align-items: flex-start; }
+  .onb-num {
+    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 13px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .onb-step-body { font-size: 13px; line-height: 1.45; }
+  .onb-step-body b { color: var(--text); }
+  .onb-step-body code {
+    background: var(--s2); padding: 1px 5px; border-radius: 4px; font-size: 12px;
+  }
+  .onb-btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 11px 20px; font-size: 14px; font-weight: 700; cursor: pointer; width: 100%;
+  }
+  .onb-btn:hover { background: var(--accentH); }
 </style>
 </head>
 <body>
 
+<div class="onb-overlay" id="onboarding">
+  <div class="onb-card">
+    <img class="onb-oc" src="assets/h0kdSPIN.webp" alt="" />
+    <h2>¡Bienvenido a Stream <span>Overlay</span>!</h2>
+    <p class="onb-sub">Reproducí videos en tu stream cuando tus viewers canjean Channel Points en Twitch. Tres pasos y estás listo:</p>
+    <div class="onb-steps">
+      <div class="onb-step">
+        <span class="onb-num">1</span>
+        <div class="onb-step-body"><b>Conectá tu Twitch.</b> En el panel <b>Twitch</b> (arriba a la izquierda) → <b>Conectar con Twitch</b> y autorizá con el código.</div>
+      </div>
+      <div class="onb-step">
+        <span class="onb-num">2</span>
+        <div class="onb-step-body"><b>Agregá videos y rewards.</b> Sumá tus videos con <b>+ Agregar</b> y creá rewards con el <b>mismo nombre exacto</b> que tienen en Twitch.</div>
+      </div>
+      <div class="onb-step">
+        <span class="onb-num">3</span>
+        <div class="onb-step-body"><b>Conectá OBS.</b> Agregá un <b>Browser Source</b> con la URL <code>http://localhost:3001/overlay</code> (la copiás desde el pie de la app).</div>
+      </div>
+    </div>
+    <button class="onb-btn" id="onbClose">¡Empezar!</button>
+  </div>
+</div>
+
 <header>
+  <img class="app-icon" id="appIcon" src="assets/h0kdSPIN.webp" alt="" title="Ver guía de inicio" />
   <h1>Stream <span>Overlay</span></h1>
   <span id="statusBadge">Sin cambios</span>
   <button class="hdr-btn" id="openFolderBtn" title="Abrir carpeta con config.json y videos/"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Carpeta</button>
@@ -651,6 +723,11 @@
     document.getElementById('saveBtn').addEventListener('click', saveConfig);
     document.getElementById('discardBtn').addEventListener('click', discardChanges);
     document.addEventListener('keydown', handleUndoKeys);
+
+    // Onboarding: shown on first run; the app icon reopens it anytime.
+    document.getElementById('onbClose').addEventListener('click', hideOnboarding);
+    document.getElementById('appIcon').addEventListener('click', showOnboarding);
+    try { if (!localStorage.getItem('onboardingSeen')) showOnboarding(); } catch (_) {}
     document.getElementById('testBtn').addEventListener('click', testReward);
     document.getElementById('addRewardBtn').addEventListener('click', addReward);
     document.getElementById('addZoneBtn').addEventListener('click', function(){ toggleZoneForm(true); });
@@ -1403,6 +1480,26 @@
       btn.disabled = false;
     }
     btn.textContent = 'Guardar config.json';
+  }
+
+  // ── Onboarding ───────────────────────────────────────────────────────────
+
+  function showOnboarding() {
+    var el = document.getElementById('onboarding');
+    el.classList.remove('closing');
+    el.classList.add('open');
+  }
+  function hideOnboarding() {
+    var el = document.getElementById('onboarding');
+    if (!el.classList.contains('open') || el.classList.contains('closing')) return;
+    try { localStorage.setItem('onboardingSeen', '1'); } catch (_) {}
+    el.classList.add('closing');   // play the exit animation, then hide
+    var done = function(e) {
+      if (e && e.target !== el) return;   // wait for the overlay's own fade-out
+      el.classList.remove('open', 'closing');
+      el.removeEventListener('animationend', done);
+    };
+    el.addEventListener('animationend', done);
   }
 
   // ── Util ──────────────────────────────────────────────────────────────────
