@@ -29,6 +29,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,5 +41,13 @@
     "category": "Utility",
     "shortDescription": "Twitch Channel Points video overlay",
     "longDescription": "Dispara videos en un overlay de OBS cuando tus viewers canjean Channel Points en Twitch. Self-hosted, sin servicios externos."
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/h0kd/h0kd-overlay/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEwQkU5MjQ1NDY0Rjk2M0QKUldROWxrOUdSWksrRUY4WWtqamVqU0MvenIrNzJKVXpmUVdrZUZSRG1zeng0dkoxTGRtR3VMMEwK"
+    }
   }
 }

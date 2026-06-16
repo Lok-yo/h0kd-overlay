@@ -556,6 +556,29 @@
     padding: 11px 20px; font-size: 14px; font-weight: 700; cursor: pointer; width: 100%;
   }
   .onb-btn:hover { background: var(--accentH); }
+
+  /* ── Update toast ── */
+  .update-toast {
+    position: fixed; right: 16px; bottom: 38px; z-index: 90;
+    display: flex; align-items: center; gap: 12px;
+    background: var(--s1); border: 1px solid var(--accent); border-radius: 10px;
+    padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.4);
+    animation: onbCardIn .24s cubic-bezier(.2,.8,.3,1);
+  }
+  .update-toast:not(.show) { display: none; }
+  .update-toast .ut-text { font-size: 13px; }
+  .update-toast .ut-text b { color: var(--text); }
+  .update-toast .ut-text small { color: var(--muted); display: block; }
+  .update-toast button {
+    background: var(--accent); color: #fff; border: none; border-radius: 7px;
+    padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  .update-toast button:hover:not(:disabled) { background: var(--accentH); }
+  .update-toast button:disabled { opacity: .6; cursor: default; }
+  .update-toast .ut-close {
+    background: none; border: none; color: var(--muted); font-weight: 400;
+    padding: 0 2px; font-size: 16px; line-height: 1;
+  }
 </style>
 </head>
 <body>
@@ -660,6 +683,12 @@
   <span>OBS Browser Source: <code id="overlayUrl" title="Click para copiar">http://localhost:3001/overlay</code></span>
 </footer>
 
+<div class="update-toast" id="updateToast">
+  <div class="ut-text"><b id="updateMsg">Actualización disponible</b><small>Se instala y reinicia la app.</small></div>
+  <button id="updateBtn">Actualizar</button>
+  <button class="ut-close" id="updateDismiss" title="Más tarde">&times;</button>
+</div>
+
 <script>
 (function() {
   'use strict';
@@ -728,6 +757,13 @@
     document.getElementById('onbClose').addEventListener('click', hideOnboarding);
     document.getElementById('appIcon').addEventListener('click', showOnboarding);
     try { if (!localStorage.getItem('onboardingSeen')) showOnboarding(); } catch (_) {}
+
+    // Auto-update: check on launch; user decides when to install.
+    document.getElementById('updateBtn').addEventListener('click', doUpdate);
+    document.getElementById('updateDismiss').addEventListener('click', function() {
+      document.getElementById('updateToast').classList.remove('show');
+    });
+    checkForUpdate();
     document.getElementById('testBtn').addEventListener('click', testReward);
     document.getElementById('addRewardBtn').addEventListener('click', addReward);
     document.getElementById('addZoneBtn').addEventListener('click', function(){ toggleZoneForm(true); });
@@ -1480,6 +1516,30 @@
       btn.disabled = false;
     }
     btn.textContent = 'Guardar config.json';
+  }
+
+  // ── Auto-update ──────────────────────────────────────────────────────────
+
+  async function checkForUpdate() {
+    try {
+      var info = await invoke('check_update');   // null = up to date
+      if (!info) return;
+      document.getElementById('updateMsg').textContent = 'Versión ' + info.version + ' disponible';
+      document.getElementById('updateToast').classList.add('show');
+    } catch (_) { /* offline / sin endpoint en dev: no molestar */ }
+  }
+
+  async function doUpdate() {
+    var btn = document.getElementById('updateBtn');
+    btn.disabled = true;
+    btn.textContent = 'Actualizando…';
+    try {
+      await invoke('install_update');   // descarga, instala y reinicia la app
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Actualizar';
+      alert('No se pudo actualizar: ' + e);
+    }
   }
 
   // ── Onboarding ───────────────────────────────────────────────────────────

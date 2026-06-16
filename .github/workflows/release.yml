@@ -32,6 +32,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update artifacts and generates latest.json for the auto-updater.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           # tauri.conf.json lives in src-tauri/; the CLI finds it from the repo root.
           # No frontend build step (frontendDist is the static src/ folder).

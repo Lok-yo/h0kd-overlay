@@ -237,6 +237,47 @@ fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+// ── Auto-update (tauri-plugin-updater) ───────────────────────────────────────
+
+#[derive(serde::Serialize)]
+struct UpdateInfo {
+    version: String,
+    notes: Option<String>,
+}
+
+/// Check the release endpoint for a newer signed version. Returns Some(info)
+/// when an update is available, None when up to date. Errors (offline, no
+/// endpoint in dev) are surfaced so the UI can stay silent.
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await.map_err(|e| e.to_string())? {
+        Some(update) => Ok(Some(UpdateInfo {
+            version: update.version.clone(),
+            notes: update.body.clone(),
+        })),
+        None => Ok(None),
+    }
+}
+
+/// Download + install the available update, then relaunch into the new version.
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "no hay actualización disponible".to_string())?;
+    update
+        .download_and_install(|_chunk, _total| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let data_dir = Arc::new(find_data_dir());
@@ -255,6 +296,7 @@ pub fn run() {
     };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state.clone())
         .setup(move |_| {
             let server_state = state.clone();
@@ -278,7 +320,9 @@ pub fn run() {
             twitch_status,
             twitch_set_client_id,
             twitch_connect,
-            twitch_disconnect
+            twitch_disconnect,
+            check_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
