@@ -8,7 +8,8 @@ node_modules/
 # Rust / Tauri build artifacts
 src-tauri/target/
 src-tauri/gen/
-src-tauri/Cargo.lock
+# Cargo.lock is committed (this is an application, not a library) for
+# reproducible builds in CI and across machines.
 
 # Build logs
 *.log
