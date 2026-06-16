@@ -1,21 +1,21 @@
 # StreamOverlay — Planning Doc
 
 > Sistema custom para reproducir videos en overlay de OBS disparados por canjes
-> de Channel Points de Twitch. Reemplazo self-hosted de TriggerFyre.
+> de Channel Points de Twitch. Solución self-hosted, sin servicios externos.
 
 ---
 
 ## 1. Contexto y problema
 
-TriggerFyre cumple bien la función básica pero tiene limitaciones:
+Las soluciones existentes cumplen la función básica pero tienen limitaciones típicas:
 
-- Límite de cantidad de videos en su plan free/paid.
-- No permite múltiples instancias simultáneas del mismo video (spam).
+- Límite de cantidad de videos en planes free/paid.
+- No permiten múltiples instancias simultáneas del mismo video (spam).
 - Sin control sobre layout, animaciones o safe zones.
-- Producto propietario, sin extensibilidad.
+- Productos propietarios, sin extensibilidad.
 
-**Objetivo del MVP**: tener un overlay propio funcionando localmente que supere
-TriggerFyre en flexibilidad, sin dependencia de servicios externos. Se diseña
+**Objetivo del MVP**: tener un overlay propio funcionando localmente, con más
+flexibilidad y sin dependencia de servicios externos. Se diseña
 pensando en una migración futura a Cloudflare/Next.js, pero el MVP es 100% local.
 
 ---

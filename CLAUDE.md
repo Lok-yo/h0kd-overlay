@@ -1,6 +1,6 @@
 # Stream Overlay — contexto para Claude Code
 
-Reemplazo self-hosted de TriggerFyre para disparar videos en un overlay de OBS
+App de escritorio self-hosted para disparar videos en un overlay de OBS
 cuando viewers canjean Channel Points en Twitch.
 
 ## Arquitectura (standalone — Tauri)

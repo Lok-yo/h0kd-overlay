@@ -1,7 +1,7 @@
 # Stream Overlay
 
 Overlay para OBS que reproduce videos cuando tus viewers canjean **Channel Points** en Twitch.
-Reemplazo self-hosted de TriggerFyre — sin límite de videos, posición random, volumen por video,
+Self-hosted y sin servicios externos — sin límite de videos, posición random, volumen por video,
 múltiples instancias simultáneas del mismo video.
 
 Es una app de escritorio (Tauri) con un **panel de control nativo** que se conecta

@@ -39,6 +39,6 @@
     "copyright": "",
     "category": "Utility",
     "shortDescription": "Twitch Channel Points video overlay",
-    "longDescription": "Self-hosted reemplazo de TriggerFyre. Dispara videos en overlay de OBS al canjear Channel Points."
+    "longDescription": "Dispara videos en un overlay de OBS cuando tus viewers canjean Channel Points en Twitch. Self-hosted, sin servicios externos."
   }
 }
