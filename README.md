@@ -75,7 +75,10 @@ A partir de acá, cada canje de Channel Points dispara el video correspondiente 
    - **Modo de reproducción** (cuando hay varios videos):
      - *Aleatorio* (por defecto): se reproduce **1 al azar** por canje.
      - *Todos a la vez*: se reproducen **todos** juntos, cada uno en su propia posición aleatoria.
-   - **Volumen**, **ancho/alto** (caja máxima — el video mantiene su aspect ratio), **duración máxima**.
+   - **Volumen** y **ancho/alto** (caja máxima — el video mantiene su aspect ratio).
+   - **Duración máxima** (en segundos, mostrada como `m:ss`): se autocompleta con la
+     duración real del video y **no deja superarla** (así los videos no se cortan).
+     Reducila si querés que el clip corte antes.
    - **Respetar safe zones** (que el video no aparezca sobre tu webcam, etc.).
 3. **Safe Zones:** definí rectángulos (x, y, ancho, alto) donde los videos no deben aparecer.
 4. **Canvas:** la resolución de tu escena (por defecto 1920×1080).

@@ -672,6 +672,10 @@
       });
     });
 
+    // Re-list videos when the window regains focus, so dropping new files in
+    // videos/ shows up without restarting the app.
+    window.addEventListener('focus', refreshVideos);
+
     // Probe server every 4s to update conn dot
     pingServer();
     setInterval(pingServer, 4000);
@@ -679,6 +683,15 @@
     // Twitch status poll
     pollTwitch();
     setInterval(pollTwitch, 2000);
+  }
+
+  async function refreshVideos() {
+    try {
+      var fresh = await invoke('list_videos');
+      if (JSON.stringify(fresh) === JSON.stringify(videos)) return;
+      videos = fresh;
+      if (sel && cfg.rewards[sel]) renderEditor(sel);   // refresh the video <select>
+    } catch (_) {}
   }
 
   // ── Twitch (modo standalone, sin Streamer.bot) ─────────────────────────────
@@ -1064,8 +1077,13 @@
       + '</div>'
 
       + '<div class="field">'
-        + '<label>Duración máxima (ms)</label>'
-        + '<input type="number" id="ri-dur" value="' + (rc.maxDuration||10000) + '" />'
+        + '<label>Duración máxima</label>'
+        + '<div class="vol-row">'
+          + '<input type="number" id="ri-dur" min="1" step="1" style="width:90px" value="' + Math.max(1, Math.round((rc.maxDuration||10000)/1000)) + '" />'
+          + '<span class="vol-value">seg</span>'
+          + '<span class="vol-value" id="durReadout">' + formatDur(rc.maxDuration||10000) + '</span>'
+        + '</div>'
+        + '<div class="size-hint" id="durHint">El video se corta al llegar a este tiempo.</div>'
       + '</div>'
 
       + '<div class="field">'
@@ -1100,9 +1118,15 @@
     });
 
     document.getElementById('ri-dur').addEventListener('input', function() {
-      cfg.rewards[name].maxDuration = parseInt(this.value) || 10000;
+      var capSec = parseFloat(this.max) || 0;   // video length, set once detected
+      var s = parseInt(this.value) || 1;
+      if (s < 1) s = 1;
+      if (capSec && s > capSec) { s = Math.round(capSec); this.value = s; }
+      cfg.rewards[name].maxDuration = s * 1000;
+      document.getElementById('durReadout').textContent = formatDur(cfg.rewards[name].maxDuration);
       markDirty();
     });
+    setupDuration(name);
 
     document.getElementById('ri-zones').addEventListener('change', function() {
       cfg.rewards[name].respectSafeZones = this.checked;
@@ -1224,23 +1248,15 @@
     }
     render();
 
-    // Probe the real video resolution once (cached). Served by the local
-    // server at /videos/<file>; metadata load is not blocked by CORS.
+    // Probe the real video metadata once (cached). Served by the local server
+    // at /videos/<file>; metadata load is not blocked by CORS.
     if (firstVideo && !meta) {
-      var probe = document.createElement('video');
-      probe.preload = 'metadata';
-      probe.muted = true;
-      probe.src = 'http://127.0.0.1:3001/' + firstVideo;
-      probe.addEventListener('loadedmetadata', function() {
-        if (probe.videoWidth && probe.videoHeight) {
-          videoMetaCache[firstVideo] = { w: probe.videoWidth, h: probe.videoHeight };
-          meta = videoMetaCache[firstVideo];
-          render();
+      probeMeta(firstVideo, function(m) {
+        if (m && m.w && m.h) { meta = m; render(); }
+        else {
+          readout.textContent = 'Caja ' + (rc.width || 480) + '×' + (rc.height || 270)
+            + '  ·  no se pudo leer el video';
         }
-      });
-      probe.addEventListener('error', function() {
-        readout.textContent = 'Caja ' + (rc.width || 480) + '×' + (rc.height || 270)
-          + '  ·  no se pudo leer el video';
       });
     }
 
@@ -1376,6 +1392,73 @@
   }
 
   // ── Util ──────────────────────────────────────────────────────────────────
+
+  // Format milliseconds as m:ss (e.g. 30000 → "0:30", 90000 → "1:30").
+  function formatDur(ms) {
+    var total = Math.max(0, Math.round((ms || 0) / 1000));
+    var m = Math.floor(total / 60);
+    var s = total % 60;
+    return m + ':' + (s < 10 ? '0' + s : s);
+  }
+
+  // Load a video's metadata once and cache { w, h, dur(seconds) }. Served by
+  // the local server at /<videos/file>; metadata load isn't blocked by CORS.
+  function probeMeta(path, cb) {
+    var hit = videoMetaCache[path];
+    if (hit && hit.dur !== undefined) { cb(hit); return; }
+    var probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.muted = true;
+    probe.src = 'http://127.0.0.1:3001/' + path;
+    probe.addEventListener('loadedmetadata', function() {
+      videoMetaCache[path] = {
+        w: probe.videoWidth || 0,
+        h: probe.videoHeight || 0,
+        dur: isFinite(probe.duration) ? probe.duration : 0
+      };
+      cb(videoMetaCache[path]);
+    });
+    probe.addEventListener('error', function() { cb(null); });
+  }
+
+  // Detect the real duration of the reward's video(s) and use it as the cap for
+  // the "Duración máxima" field: you can't set more than the video lasts, and an
+  // unset/legacy/over-the-cap value is auto-filled to the full video length so
+  // the clip never gets cut off. A shorter value the user chose is preserved.
+  function setupDuration(name) {
+    var rc      = cfg.rewards[name];
+    var input   = document.getElementById('ri-dur');
+    var readout = document.getElementById('durReadout');
+    var hint    = document.getElementById('durHint');
+    var vids    = rc.videos || [];
+    if (!vids.length) { hint.textContent = 'Asigná un video para detectar su duración.'; return; }
+
+    hint.textContent = 'Leyendo duración del video…';
+    var longest = 0, pending = vids.length;
+    vids.forEach(function(p) {
+      probeMeta(p, function(m) {
+        if (m && m.dur) longest = Math.max(longest, m.dur);
+        if (--pending === 0) applyCap();
+      });
+    });
+
+    function applyCap() {
+      // Re-query: renderEditor may have re-run while metadata loaded async.
+      if (document.getElementById('ri-dur') !== input) return;
+      if (!longest) { hint.textContent = 'No se pudo leer la duración del video.'; return; }
+      var capMs = Math.round(longest * 1000);
+      input.max = Math.ceil(longest);
+      var cur = rc.maxDuration || 0;
+      if (cur === 0 || cur === 10000 || cur > capMs) {  // unset / legacy default / over the cap
+        rc.maxDuration = capMs;
+        input.value = Math.round(longest);
+        markDirty();
+      }
+      readout.textContent = formatDur(rc.maxDuration);
+      hint.textContent = 'Máximo ' + formatDur(capMs) + ' (duración del video'
+        + (vids.length > 1 ? ' más largo' : '') + '). Reducilo si querés cortarlo antes.';
+    }
+  }
 
   function esc(s) {
     return String(s)
