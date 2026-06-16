@@ -156,17 +156,15 @@ async fn twitch_disconnect(state: tauri::State<'_, AppState>) -> Result<(), Stri
 fn open_data_dir(state: tauri::State<AppState>) -> Result<(), String> {
     let path = state.data_dir.as_path();
     #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer")
-            .arg(path)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = path;
-        return Err("unsupported platform".into());
-    }
+    let program = "explorer";
+    #[cfg(target_os = "macos")]
+    let program = "open";
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let program = "xdg-open";
+    std::process::Command::new(program)
+        .arg(path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
