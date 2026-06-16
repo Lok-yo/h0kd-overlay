@@ -65,7 +65,8 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  .hdr-btn:hover { background: var(--border); }
+  .hdr-btn:hover:not(:disabled) { background: var(--border); }
+  .hdr-btn:disabled { opacity: .4; cursor: default; }
   /* Inline SVG icons (Lucide, MIT) — inherit text color, no external deps. */
   .icon { width: 15px; height: 15px; flex: none; vertical-align: -3px; }
   #saveBtn {
@@ -514,6 +515,7 @@
   <button class="hdr-btn" id="openFolderBtn" title="Abrir carpeta con config.json y videos/"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Carpeta</button>
   <select id="testRewardSel"></select>
   <button id="testBtn"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>Probar</button>
+  <button class="hdr-btn" id="discardBtn" title="Descartar todos los cambios sin guardar" disabled><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"/></svg>Descartar</button>
   <button id="saveBtn" disabled>Guardar config.json</button>
 </header>
 
@@ -621,6 +623,14 @@
   var dirty   = false;
   var videoMetaCache = {};  // path → { w, h } real video resolution
 
+  // Undo/redo history. Each entry is a JSON snapshot of { cfg, sel }. Rapid
+  // edits (e.g. dragging the size handle) are coalesced via a debounce so one
+  // undo step = one logical change. `savedIndex` marks the last saved state.
+  var history    = [];
+  var histIndex  = -1;
+  var savedIndex = -1;
+  var histTimer  = null;
+
   // ── Boot ─────────────────────────────────────────────────────────────────
 
   async function init() {
@@ -633,8 +643,11 @@
       videos = [];
     }
     renderAll();
+    initHistory();
 
     document.getElementById('saveBtn').addEventListener('click', saveConfig);
+    document.getElementById('discardBtn').addEventListener('click', discardChanges);
+    document.addEventListener('keydown', handleUndoKeys);
     document.getElementById('testBtn').addEventListener('click', testReward);
     document.getElementById('addRewardBtn').addEventListener('click', addReward);
     document.getElementById('addZoneBtn').addEventListener('click', function(){ toggleZoneForm(true); });
@@ -775,12 +788,90 @@
 
   // ── Dirty tracking ────────────────────────────────────────────────────────
 
+  // ── Undo/redo history ──────────────────────────────────────────────────────
+
+  // Snapshots track only `cfg` (the document). `sel` is UI navigation state:
+  // after undo/redo we keep the user on the same reward so the change is seen
+  // immediately, and renderAll() deselects only if that reward no longer exists.
+  function snapshot() { return JSON.stringify(cfg); }
+
+  function applySnapshot(s) { cfg = JSON.parse(s); }
+
+  function initHistory() {
+    history    = [snapshot()];
+    histIndex  = 0;
+    savedIndex = 0;
+    updateDirtyUI();
+  }
+
+  // Push the current state as a new history entry, dropping any redo branch.
+  function recordHistory() {
+    histTimer = null;
+    var snap = snapshot();
+    if (snap === history[histIndex]) return;   // nothing actually changed
+    history = history.slice(0, histIndex + 1);
+    history.push(snap);
+    histIndex = history.length - 1;
+    updateDirtyUI();
+  }
+
+  // Coalesce bursts of edits into a single undo step.
+  function scheduleRecord() {
+    if (histTimer) clearTimeout(histTimer);
+    histTimer = setTimeout(recordHistory, 350);
+  }
+
+  // Commit any pending debounced edit immediately (before undo/redo/save).
+  function flushRecord() {
+    if (histTimer) { clearTimeout(histTimer); recordHistory(); }
+  }
+
+  function undo() {
+    flushRecord();
+    if (histIndex <= 0) return;
+    histIndex--;
+    applySnapshot(history[histIndex]);
+    renderAll();
+    updateDirtyUI();
+  }
+
+  function redo() {
+    flushRecord();
+    if (histIndex >= history.length - 1) return;
+    histIndex++;
+    applySnapshot(history[histIndex]);
+    renderAll();
+    updateDirtyUI();
+  }
+
+  // Cmd/Ctrl+Z = undo, Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y = redo.
+  function handleUndoKeys(e) {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    var k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+    else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
+  }
+
+  // Reflect dirty state (current vs last saved) in the badge and buttons.
+  function updateDirtyUI() {
+    dirty = (histIndex !== savedIndex);
+    var badge = document.getElementById('statusBadge');
+    if (dirty) { badge.textContent = 'Cambios sin guardar'; badge.className = 'dirty'; }
+    else       { badge.textContent = 'Sin cambios';         badge.className = ''; }
+    document.getElementById('saveBtn').disabled = !dirty;
+    document.getElementById('discardBtn').disabled = !dirty;
+  }
+
+  // Called by every edit. Immediate badge feedback; the history entry itself
+  // is debounced so rapid input collapses into one undo step.
   function markDirty() {
-    dirty = true;
     var badge = document.getElementById('statusBadge');
     badge.textContent = 'Cambios sin guardar';
     badge.className = 'dirty';
     document.getElementById('saveBtn').disabled = false;
+    document.getElementById('discardBtn').disabled = false;
+    dirty = true;
+    scheduleRecord();
   }
 
   function markSaved() {
@@ -789,9 +880,21 @@
     badge.textContent = 'Guardado';
     badge.className = 'saved';
     document.getElementById('saveBtn').disabled = true;
+    document.getElementById('discardBtn').disabled = true;
     setTimeout(function(){
       if (!dirty) { badge.textContent = 'Sin cambios'; badge.className = ''; }
     }, 2000);
+  }
+
+  // Discard ALL unsaved changes, jumping back to the last saved state. The
+  // redo branch is kept, so this is itself reversible with Cmd/Ctrl+Shift+Z.
+  function discardChanges() {
+    flushRecord();
+    if (histIndex === savedIndex) return;
+    histIndex = savedIndex;
+    applySnapshot(history[savedIndex]);
+    renderAll();   // re-renders lists/editor; clears `sel` if its reward is gone
+    updateDirtyUI();
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -801,9 +904,11 @@
     renderTestSelect();
     renderZonesList();
     renderCanvas();
-    if (sel !== null) {
-      if (cfg.rewards[sel]) renderEditor(sel);
-      else { sel = null; showEmpty(); }
+    if (sel !== null && cfg.rewards[sel]) {
+      renderEditor(sel);
+    } else {
+      sel = null;
+      showEmpty();
     }
   }
 
@@ -1012,7 +1117,6 @@
     });
 
     document.getElementById('deleteRewardBtn').addEventListener('click', function() {
-      if (!confirm('Eliminar el reward "' + name + '"?')) return;
       delete cfg.rewards[name];
       sel = null;
       markDirty();
@@ -1235,7 +1339,6 @@
   }
 
   function removeZone(idx) {
-    if (!confirm('Eliminar esta safe zone?')) return;
     cfg.safeZones.exclude.splice(idx, 1);
     markDirty();
     renderZonesList();
@@ -1248,7 +1351,9 @@
     btn.disabled = true;
     btn.textContent = 'Guardando...';
     try {
+      flushRecord();
       await invoke('save_config', { cfg: cfg });
+      savedIndex = histIndex;
       markSaved();
     } catch(e) {
       alert('Error al guardar: ' + e);
