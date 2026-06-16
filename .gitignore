@@ -19,3 +19,8 @@ twitch.json
 
 # macOS
 .DS_Store
+
+# Dev-only / personal (kept local, not in the public repo)
+/CLAUDE.md
+/PLANNING.md
+/config.json
