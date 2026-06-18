@@ -246,7 +246,7 @@
   .size-stage {
     position: relative;
     width: 100%;
-    max-width: 380px;
+    max-width: 420px;
     min-height: 48px;
     margin-bottom: 8px;
     display: flex;
@@ -440,7 +440,7 @@
   }
   .zone-preview .zp-handle {
     position: absolute;
-    right: -7px; bottom: -7px;
+    right: 0; bottom: 0;
     width: 14px; height: 14px;
     background: var(--danger);
     border: 2px solid #fff;
@@ -693,7 +693,7 @@
   <select id="testRewardSel"></select>
   <button id="testBtn"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>Probar</button>
   <button class="hdr-btn" id="discardBtn" title="Descartar todos los cambios sin guardar" disabled><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"/></svg>Descartar</button>
-  <button id="saveBtn" disabled>Guardar config.json</button>
+  <button id="saveBtn" disabled>Guardar</button>
 </header>
 
 <main>
@@ -1597,7 +1597,7 @@
 
   function setupSizePreview(name) {
     var rc      = cfg.rewards[name];
-    var DISPLAY_MAX = 220;   // px del lado más largo del video en el preview (al 100%)
+    var DISPLAY_MAX = 360;   // px del lado más largo del video en el preview (al 100%)
 
     var box     = document.getElementById('sizeBox');
     var vidEl   = document.getElementById('sizeVideoEl');
@@ -1878,7 +1878,7 @@
       alert('Error al guardar: ' + e);
       btn.disabled = false;
     }
-    btn.textContent = 'Guardar config.json';
+    btn.textContent = 'Guardar';
   }
 
   // ── Auto-update ──────────────────────────────────────────────────────────
