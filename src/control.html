@@ -180,6 +180,8 @@
     align-items: center;
     gap: 6px;
   }
+  .zone-item:hover { background: var(--border); }
+  .zone-item.active { box-shadow: inset 0 0 0 1px var(--accent); }
   .zone-item .z-name { font-weight: 600; }
   .zone-item .z-coords { font-size: 11px; color: var(--muted); }
 
@@ -240,37 +242,28 @@
   .inline-row { display: flex; gap: 12px; }
   .inline-row .field { flex: 1; }
 
-  /* Size preview (mini-canvas con caja redimensionable) */
-  .size-preview {
+  /* Size preview (muestra solo la zona del video, escalada con el slider) */
+  .size-stage {
     position: relative;
-    background:
-      linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 25%,
-      linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0 / 25% 100%,
-      var(--s2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 10px;
+    width: 100%;
+    max-width: 380px;
+    min-height: 48px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .size-stage .ss-video {
+    background: rgba(145,71,255,.18);
+    outline: 1px solid var(--accent);
+    border-radius: 2px;
     overflow: hidden;
-    touch-action: none;
+    transition: width .08s linear, height .08s linear;
   }
-  .size-preview .sp-zone {
-    position: absolute;
-    background: rgba(192,57,43,.18);
-    border: 1px dashed rgba(192,57,43,.7);
-    pointer-events: none;
-  }
-  .size-preview .sp-box {
-    position: absolute;
-    top: 0; left: 0;
-    border: 1px dashed var(--accent);
-    box-sizing: border-box;
-  }
-  .size-preview .sp-video {
-    position: absolute;
-    top: 0; left: 0;
-    background: rgba(145,71,255,.45);
-    border: 1px solid var(--accent);
-    box-sizing: border-box;
+  .size-stage .ss-video video {
+    width: 100%; height: 100%;
+    display: block;
+    object-fit: cover;
   }
   .size-readout {
     font-size: 11px;
@@ -278,18 +271,32 @@
     margin: -2px 0 8px;
     min-height: 14px;
   }
-  .size-preview .sp-handle {
-    position: absolute;
-    left: 0; top: 0;
-    width: 14px; height: 14px;
-    background: var(--accent);
-    border: 2px solid #fff;
-    border-radius: 3px;
-    cursor: nwse-resize;
-    box-shadow: 0 1px 4px rgba(0,0,0,.5);
-    z-index: 2;
-  }
   .size-hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+
+  /* Transition preview (mini-stage que reproduce la animación elegida) */
+  .anim-preview {
+    position: relative;
+    height: 96px;
+    margin-top: 8px;
+    background:
+      linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 25%,
+      linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0 / 25% 100%,
+      var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .anim-preview .ap-box {
+    width: 96px; height: 54px;
+    border-radius: 4px;
+    background: rgba(145,71,255,.5);
+    border: 1px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 11px; font-weight: 700;
+  }
 
   /* Volume slider */
   .vol-row { display: flex; align-items: center; gap: 12px; }
@@ -404,6 +411,43 @@
     display: none;
   }
   .zone-form.open { display: block; }
+  /* Safe-zone preview (mini-canvas con caja arrastrable + redimensionable) */
+  .zone-preview {
+    position: relative;
+    width: 100%;
+    background:
+      linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 25%,
+      linear-gradient(90deg, var(--border) 1px, transparent 1px) 0 0 / 25% 100%,
+      var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .zone-preview .zp-other {
+    position: absolute;
+    background: rgba(192,57,43,.12);
+    border: 1px dashed rgba(192,57,43,.45);
+    pointer-events: none;
+  }
+  .zone-preview .zp-box {
+    position: absolute;
+    background: rgba(192,57,43,.28);
+    border: 1px solid var(--danger);
+    box-sizing: border-box;
+    cursor: move;
+  }
+  .zone-preview .zp-handle {
+    position: absolute;
+    right: -7px; bottom: -7px;
+    width: 14px; height: 14px;
+    background: var(--danger);
+    border: 2px solid #fff;
+    border-radius: 3px;
+    cursor: nwse-resize;
+    box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
   .zone-form .zf-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -677,6 +721,10 @@
       </div>
       <div id="zonesList"></div>
       <div class="zone-form" id="zoneForm">
+        <div class="size-hint">Arrastrá la caja para moverla y la esquina ◢ para redimensionarla.</div>
+        <div class="zone-preview" id="zonePreview">
+          <div class="zp-box" id="zpBox"><span class="zp-handle" id="zpHandle"></span></div>
+        </div>
         <div class="zf-grid">
           <div><label>Nombre</label><input id="zfName" type="text" placeholder="webcam" /></div>
           <div><label>X</label><input id="zfX" type="number" placeholder="1500" /></div>
@@ -759,6 +807,7 @@
   var videos  = [];
   var sel     = null;   // reward name currently selected
   var dirty   = false;
+  var editingZone = null;   // índice de la safe zone en edición, o null = nueva
   var videoMetaCache = {};  // path → { w, h, dur } real video metadata
   var durTouched = {};      // reward name → true once the user edits its duration by hand
   var twitchRewards = [];   // channel's Channel Points rewards [{id, title}], loaded when connected
@@ -823,7 +872,7 @@
     document.getElementById('addRewardBtn').addEventListener('click', addReward);
     document.getElementById('addZoneBtn').addEventListener('click', function(){ toggleZoneForm(true); });
     document.getElementById('zfCancel').addEventListener('click', function(){ toggleZoneForm(false); });
-    document.getElementById('zfSave').addEventListener('click', addZone);
+    document.getElementById('zfSave').addEventListener('click', saveZone);
     document.getElementById('canvasW').addEventListener('input', function(){ cfg.canvas.width = parseInt(this.value)||1920; markDirty(); });
     document.getElementById('canvasH').addEventListener('input', function(){ cfg.canvas.height = parseInt(this.value)||1080; markDirty(); });
     document.getElementById('openFolderBtn').addEventListener('click', function() {
@@ -1179,14 +1228,18 @@
       return;
     }
     container.innerHTML = zones.map(function(z, i) {
-      return '<div class="zone-item">'
+      var editing = i === editingZone ? ' active' : '';
+      return '<div class="zone-item' + editing + '" data-idx="' + i + '" title="Editar zona" style="cursor:pointer">'
         + '<div><div class="z-name">' + esc(z.name || 'zona ' + (i+1)) + '</div>'
         + '<div class="z-coords">' + z.x + ', ' + z.y + '  ' + z.width + '×' + z.height + '</div></div>'
         + '<button class="del-btn" data-idx="' + i + '" title="Eliminar zona">' + ICON.x + '</button>'
         + '</div>';
     }).join('');
+    container.querySelectorAll('.zone-item').forEach(function(item) {
+      item.addEventListener('click', function(){ toggleZoneForm(true, parseInt(this.dataset.idx)); });
+    });
     container.querySelectorAll('.del-btn').forEach(function(btn) {
-      btn.addEventListener('click', function(){ removeZone(parseInt(this.dataset.idx)); });
+      btn.addEventListener('click', function(e){ e.stopPropagation(); removeZone(parseInt(this.dataset.idx)); });
     });
   }
 
@@ -1295,17 +1348,14 @@
 
       + '<div class="field">'
         + '<label>Tamaño del video</label>'
-        + '<div class="size-hint">Arrastrá la esquina ◢ para ajustar el tamaño (mantiene la proporción real del video). En rojo, las safe zones.</div>'
-        + '<div class="size-preview" id="sizePreview">'
-          + '<div class="sp-box" id="sizeBox">'
-            + '<div class="sp-video" id="sizeVideo"></div>'
-            + '<span class="sp-handle" id="sizeHandle"></span>'
-          + '</div>'
+        + '<div class="size-hint">Movés el slider para cambiar el tamaño. El preview muestra el video tal cual se verá (la posición en pantalla es al azar).</div>'
+        + '<div class="size-stage" id="sizeStage">'
+          + '<div class="ss-video" id="sizeBox"><video id="sizeVideoEl" muted playsinline></video></div>'
         + '</div>'
         + '<div class="size-readout" id="sizeReadout"></div>'
-        + '<div class="inline-row">'
-          + '<div class="field" style="margin-bottom:0"><label>Ancho (px)</label><input type="number" id="ri-w" value="' + (rc.width||480) + '" /></div>'
-          + '<div class="field" style="margin-bottom:0"><label>Alto (px)</label><input type="number" id="ri-h" value="' + (rc.height||270) + '" /></div>'
+        + '<div class="vol-row">'
+          + '<input type="range" id="ri-size" min="5" max="100" step="1" value="' + sizePctOf(rc) + '" />'
+          + '<span class="vol-value" id="sizePct">' + sizePctOf(rc) + '%</span>'
         + '</div>'
       + '</div>'
 
@@ -1317,6 +1367,18 @@
           + '<span class="vol-value" id="durReadout">' + formatDur(rc.maxDuration||10000) + '</span>'
         + '</div>'
         + '<div class="size-hint" id="durHint">El video se corta al llegar a este tiempo.</div>'
+      + '</div>'
+
+      + '<div class="field">'
+        + '<label>Transiciones</label>'
+        + '<div class="size-hint">Animación de entrada y de salida del video.</div>'
+        + '<div class="inline-row">'
+          + '<div class="field" style="margin-bottom:0"><label>Entrada</label>'
+            + '<select id="ri-animin" class="ri-twitch-link">' + animOptionsHtml(ANIM_IN_OPTS, rc.animIn || 'pop') + '</select></div>'
+          + '<div class="field" style="margin-bottom:0"><label>Salida</label>'
+            + '<select id="ri-animout" class="ri-twitch-link">' + animOptionsHtml(ANIM_OUT_OPTS, rc.animOut || 'pop') + '</select></div>'
+        + '</div>'
+        + '<div class="anim-preview" id="animPreview"><div class="ap-box" id="apBox">▶</div></div>'
       + '</div>'
 
       + '<div class="field">'
@@ -1375,6 +1437,21 @@
       markDirty();
     });
 
+    document.getElementById('ri-animin').addEventListener('change', function() {
+      cfg.rewards[name].animIn = this.value;
+      markDirty();
+      playAnimPreview(name);
+    });
+    document.getElementById('ri-animout').addEventListener('change', function() {
+      cfg.rewards[name].animOut = this.value;
+      markDirty();
+      playAnimPreview(name);
+    });
+    document.getElementById('animPreview').addEventListener('click', function() {
+      playAnimPreview(name);
+    });
+    playAnimPreview(name);
+
     document.querySelectorAll('#videoList .del-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var i = parseInt(this.dataset.vi);
@@ -1406,42 +1483,128 @@
     });
   }
 
-  // ── Size preview (mini-canvas con caja redimensionable) ───────────────────
+  // ── Transiciones (entrada/salida) ─────────────────────────────────────────
+  // Las claves coinciden con IN_ANIMS/OUT_ANIMS del overlay.
+  var ANIM_IN_OPTS = [
+    ['pop',        'Pop (rebote)'],
+    ['fade',       'Fundido'],
+    ['zoom',       'Zoom'],
+    ['slideUp',    'Deslizar desde abajo'],
+    ['slideDown',  'Deslizar desde arriba'],
+    ['slideLeft',  'Deslizar desde la derecha'],
+    ['slideRight', 'Deslizar desde la izquierda'],
+    ['none',       'Ninguna (instantáneo)']
+  ];
+  var ANIM_OUT_OPTS = [
+    ['pop',        'Pop (rebote)'],
+    ['fade',       'Fundido'],
+    ['zoom',       'Zoom'],
+    ['slideUp',    'Deslizar hacia arriba'],
+    ['slideDown',  'Deslizar hacia abajo'],
+    ['slideLeft',  'Deslizar hacia la izquierda'],
+    ['slideRight', 'Deslizar hacia la derecha'],
+    ['none',       'Ninguna (instantáneo)']
+  ];
+
+  function animOptionsHtml(opts, selected) {
+    return opts.map(function(o) {
+      return '<option value="' + o[0] + '"' + (o[0] === selected ? ' selected' : '') + '>' + o[1] + '</option>';
+    }).join('');
+  }
+
+  // Keyframes equivalentes a las del overlay, para el mini-preview del panel.
+  var IN_KF = {
+    pop:        [{ opacity: 0, transform: 'scale(0.75)' },      { opacity: 1, transform: 'none' }],
+    fade:       [{ opacity: 0 },                                { opacity: 1 }],
+    zoom:       [{ opacity: 0, transform: 'scale(0.4)' },       { opacity: 1, transform: 'none' }],
+    slideUp:    [{ opacity: 0, transform: 'translateY(28px)' }, { opacity: 1, transform: 'none' }],
+    slideDown:  [{ opacity: 0, transform: 'translateY(-28px)' },{ opacity: 1, transform: 'none' }],
+    slideLeft:  [{ opacity: 0, transform: 'translateX(28px)' }, { opacity: 1, transform: 'none' }],
+    slideRight: [{ opacity: 0, transform: 'translateX(-28px)' },{ opacity: 1, transform: 'none' }]
+  };
+  var OUT_KF = {
+    pop:        [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(0.75)' }],
+    fade:       [{ opacity: 1 },                    { opacity: 0 }],
+    zoom:       [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(0.4)' }],
+    slideUp:    [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-28px)' }],
+    slideDown:  [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(28px)' }],
+    slideLeft:  [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-28px)' }],
+    slideRight: [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(28px)' }]
+  };
+
+  var animPreviewTimer = null;
+  function playAnimPreview(name) {
+    var box = document.getElementById('apBox');
+    if (!box || !box.animate) return;
+    var rc = cfg.rewards[name];
+    if (!rc) return;
+    var ai = rc.animIn  || 'pop';
+    var ao = rc.animOut || 'pop';
+
+    clearTimeout(animPreviewTimer);
+    box.getAnimations().forEach(function(a) { a.cancel(); });
+    box.style.opacity = '1';
+
+    var inDur  = ai === 'none' ? 1 : (ai === 'pop' ? 250 : ai === 'fade' ? 300 : 350);
+    var outDur = ao === 'none' ? 1 : (ao === 'pop' ? 250 : ao === 'fade' ? 300 : 300);
+    var inEase = ai === 'pop' ? 'cubic-bezier(0.34,1.56,0.64,1)'
+               : ai.indexOf('slide') === 0 ? 'cubic-bezier(0.22,1,0.36,1)' : 'ease-out';
+
+    var aIn = box.animate(IN_KF[ai] || IN_KF.pop, { duration: inDur, easing: inEase, fill: 'both' });
+    aIn.onfinish = function() {
+      animPreviewTimer = setTimeout(function() {
+        var aOut = box.animate(OUT_KF[ao] || OUT_KF.pop, { duration: outDur, easing: 'ease-in', fill: 'both' });
+        // Tras la salida, restaura el box visible para poder re-disparar.
+        aOut.onfinish = function() {
+          box.getAnimations().forEach(function(a) { a.cancel(); });
+          box.style.opacity = '1';
+          box.style.transform = 'none';
+        };
+      }, 650);
+    };
+  }
+
+  // ── Size preview (slider + preview que muestra solo la zona del video) ─────
+
+  // El tamaño se controla con un único slider: 0–100% del tamaño máximo que
+  // el video puede ocupar en pantalla (fit). 100% = el video llena la pantalla
+  // en la dimensión que topa primero. Esto funciona igual para videos
+  // horizontales (16:9), verticales (shorts/reels 9:16) y cuadrados, sin que
+  // ninguno se salga del canvas. width/height en config = tamaño renderizado real.
+  function videoDims(rc) {
+    var fv = (rc.videos && rc.videos[0]) || null;
+    var m  = fv ? videoMetaCache[fv] : null;
+    return { w: (m && m.w) ? m.w : 16, h: (m && m.h) ? m.h : 9 };
+  }
+  // Escala que hace que el video llene la pantalla (sin recortar) = 100%.
+  function fitScaleFor(vw, vh) {
+    var canvasW = (cfg.canvas && cfg.canvas.width)  || 1920;
+    var canvasH = (cfg.canvas && cfg.canvas.height) || 1080;
+    return Math.min(canvasW / vw, canvasH / vh);
+  }
+  function sizePctOf(rc) {
+    // El % elegido es la fuente de verdad: así se mantiene al cambiar de video
+    // (un 67% sigue siendo 67% aunque pases de horizontal a vertical).
+    if (typeof rc.sizePct === 'number') {
+      return Math.max(5, Math.min(100, Math.round(rc.sizePct)));
+    }
+    // Back-compat: rewards viejos sin sizePct → derivar del ancho guardado.
+    var d  = videoDims(rc);
+    var fs = fitScaleFor(d.w, d.h);
+    var pct = Math.round(((rc.width || 480) / (d.w * fs)) * 100);
+    return Math.max(5, Math.min(100, pct));
+  }
 
   function setupSizePreview(name) {
     var rc      = cfg.rewards[name];
-    var canvasW = (cfg.canvas && cfg.canvas.width)  || 1920;
-    var canvasH = (cfg.canvas && cfg.canvas.height) || 1080;
-    var PREV_W  = 320;
-    var scale   = PREV_W / canvasW;
+    var DISPLAY_MAX = 220;   // px del lado más largo del video en el preview (al 100%)
 
-    var preview = document.getElementById('sizePreview');
     var box     = document.getElementById('sizeBox');
-    var vid     = document.getElementById('sizeVideo');
+    var vidEl   = document.getElementById('sizeVideoEl');
     var readout = document.getElementById('sizeReadout');
-    var handle  = document.getElementById('sizeHandle');
-    var inputW  = document.getElementById('ri-w');
-    var inputH  = document.getElementById('ri-h');
-    if (!preview) return;
-
-    preview.style.width  = PREV_W + 'px';
-    preview.style.height = Math.round(canvasH * scale) + 'px';
-
-    // Safe zones (en rojo, detrás de la caja).
-    var zones = (cfg.safeZones && cfg.safeZones.exclude) || [];
-    zones.forEach(function(z) {
-      var el = document.createElement('div');
-      el.className = 'sp-zone';
-      el.style.left   = Math.round((z.x || 0) * scale) + 'px';
-      el.style.top    = Math.round((z.y || 0) * scale) + 'px';
-      el.style.width  = Math.round((z.width  || 0) * scale) + 'px';
-      el.style.height = Math.round((z.height || 0) * scale) + 'px';
-      el.title = z.name || 'safe zone';
-      preview.insertBefore(el, box);
-    });
-
-    function clampW(v) { return Math.max(20, Math.min(canvasW, Math.round(v))); }
-    function clampH(v) { return Math.max(20, Math.min(canvasH, Math.round(v))); }
+    var slider  = document.getElementById('ri-size');
+    var pctLbl  = document.getElementById('sizePct');
+    if (!box || !slider) return;
 
     var firstVideo = (rc.videos && rc.videos[0]) || null;
     var meta = firstVideo ? videoMetaCache[firstVideo] : null;
@@ -1452,106 +1615,69 @@
       return 'cuadrado';
     }
 
-    // Draw the box (max constraint) and, if we know the video's real
-    // resolution, the actual rendered rect fitted inside it (same math as
-    // the overlay: scale = min(boxW/vw, boxH/vh)).
-    function placeHandle(cornerXpx, cornerYpx) {
-      handle.style.left = (cornerXpx - 7) + 'px';
-      handle.style.top  = (cornerYpx - 7) + 'px';
+    // Carga el contenido real del video (un frame) en el preview.
+    if (firstVideo && vidEl && vidEl.dataset.src !== firstVideo) {
+      vidEl.dataset.src = firstVideo;
+      vidEl.src = 'http://127.0.0.1:3001/' + firstVideo;
+      vidEl.addEventListener('loadeddata', function() {
+        try { vidEl.currentTime = Math.min(0.1, (vidEl.duration || 1) / 2); } catch (_) {}
+      }, { once: true });
+    } else if (!firstVideo && vidEl) {
+      vidEl.removeAttribute('src'); vidEl.dataset.src = '';
     }
 
-    function render() {
-      var w = rc.width || 480, h = rc.height || 270;
+    // Dimensiones naturales del video (resolución real si la conocemos).
+    function dims() {
+      return (meta && meta.w && meta.h) ? { w: meta.w, h: meta.h } : { w: 16, h: 9 };
+    }
 
-      if (meta && meta.w && meta.h) {
-        // Show only the real rendered video (box fitted to its aspect ratio),
-        // so the outline hugs the violet rect exactly.
-        var s  = Math.min(w / meta.w, h / meta.h);
-        var fw = Math.round(meta.w * s);
-        var fh = Math.round(meta.h * s);
-        box.style.borderStyle = 'none';
-        box.style.width  = Math.max(2, fw * scale) + 'px';
-        box.style.height = Math.max(2, fh * scale) + 'px';
-        vid.style.display = 'block';
-        vid.style.width   = '100%';
-        vid.style.height  = '100%';
-        placeHandle(fw * scale, fh * scale);
-        readout.textContent =
-          fw + '×' + fh + ' px  (' + orientation(meta.w, meta.h) + ', proporción ' + meta.w + '×' + meta.h + ')';
-      } else {
-        // No video metadata yet → show the raw box as a dashed rectangle.
-        box.style.borderStyle = 'dashed';
-        box.style.width  = Math.max(2, w * scale) + 'px';
-        box.style.height = Math.max(2, h * scale) + 'px';
-        vid.style.display = 'none';
-        placeHandle(w * scale, h * scale);
-        readout.textContent = firstVideo
-          ? w + '×' + h + ' px  ·  leyendo proporción del video…'
-          : w + '×' + h + ' px  ·  sin video asignado';
+    // Dibuja el preview (solo visual) a partir de un tamaño renderizado.
+    function drawBox(rW, rH, d, pct) {
+      var fs = fitScaleFor(d.w, d.h);
+      // El video abraza su caja (sin marco); el lado más largo topa en
+      // DISPLAY_MAX al 100% — vale igual para horizontal y vertical.
+      var dScale = DISPLAY_MAX / Math.max(d.w * fs, d.h * fs);
+      box.style.width  = Math.max(16, Math.round(rW * dScale)) + 'px';
+      box.style.height = Math.max(12, Math.round(rH * dScale)) + 'px';
+      pctLbl.textContent = pct + '%';
+      if (slider.value != pct) slider.value = pct;
+      var ori = orientation(rW, rH);
+      readout.textContent = firstVideo
+        ? rW + '×' + rH + ' px  ·  ' + pct + '% de la pantalla  ·  ' + ori
+        : rW + '×' + rH + ' px  ·  ' + pct + '% de la pantalla  ·  sin video asignado';
+    }
+
+    // Recalcula width/height desde un %, usando la proporción ACTUAL del video.
+    // Solo se llama cuando ya conocemos la proporción real (o desde el slider),
+    // así nunca deforma un tamaño guardado mientras no sabemos la proporción.
+    function commitPct(pct, commit) {
+      pct = Math.max(5, Math.min(100, Math.round(pct)));
+      var d  = dims();
+      var fs = fitScaleFor(d.w, d.h);               // 100% = llena la pantalla
+      var rW = Math.round(d.w * fs * pct / 100);
+      var rH = Math.round(d.h * fs * pct / 100);
+      rc.sizePct = pct;        // fuente de verdad (se mantiene entre videos)
+      rc.width   = rW;         // tamaño renderizado real (lo usa el overlay)
+      rc.height  = rH;
+      drawBox(rW, rH, d, pct);
+      if (commit) markDirty();
+    }
+
+    if (meta) {
+      // Ya conocemos la proporción → normaliza al % guardado.
+      commitPct(sizePctOf(rc), false);
+    } else {
+      // Todavía no: muestra el tamaño guardado tal cual (sin tocarlo) y sondea.
+      var pct0 = sizePctOf(rc);
+      drawBox(rc.width || 480, rc.height || 270, dims(), pct0);
+      if (firstVideo) {
+        probeMeta(firstVideo, function(m) {
+          if (m && m.w && m.h) { meta = m; commitPct(sizePctOf(rc), false); }
+        });
       }
     }
-    render();
 
-    // Probe the real video metadata once (cached). Served by the local server
-    // at /videos/<file>; metadata load is not blocked by CORS.
-    if (firstVideo && !meta) {
-      probeMeta(firstVideo, function(m) {
-        if (m && m.w && m.h) { meta = m; render(); }
-        else {
-          readout.textContent = 'Caja ' + (rc.width || 480) + '×' + (rc.height || 270)
-            + '  ·  no se pudo leer el video';
-        }
-      });
-    }
-
-    inputW.addEventListener('input', function() {
-      rc.width = clampW(parseInt(this.value) || 480); render(); markDirty();
-    });
-    inputH.addEventListener('input', function() {
-      rc.height = clampH(parseInt(this.value) || 270); render(); markDirty();
-    });
-
-    // Resize arrastrando la esquina inferior-derecha.
-    var dragging = false, startX = 0, startY = 0, startW = 0, startH = 0;
-    handle.addEventListener('pointerdown', function(e) {
-      e.preventDefault();
-      dragging = true;
-      startX = e.clientX; startY = e.clientY;
-      startW = rc.width || 480; startH = rc.height || 270;
-      // Drag continues from the video's currently rendered size (no jump).
-      if (meta && meta.w && meta.h) {
-        var s0 = Math.min(startW / meta.w, startH / meta.h);
-        startW = Math.round(meta.w * s0);
-        startH = Math.round(meta.h * s0);
-      }
-      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
-    });
-    handle.addEventListener('pointermove', function(e) {
-      if (!dragging) return;
-      var tW = startW + (e.clientX - startX) / scale;
-      var tH = startH + (e.clientY - startY) / scale;
-      if (meta && meta.w && meta.h) {
-        // Scale the box to the video's aspect ratio so the handle stays glued
-        // to the video corner and it grows/shrinks proportionally.
-        var s = Math.min(clampW(tW) / meta.w, clampH(tH) / meta.h);
-        rc.width  = clampW(meta.w * s);
-        rc.height = clampH(meta.h * s);
-      } else {
-        rc.width  = clampW(tW);
-        rc.height = clampH(tH);
-      }
-      inputW.value = rc.width;
-      inputH.value = rc.height;
-      render();
-      markDirty();
-    });
-    function endDrag(e) {
-      if (!dragging) return;
-      dragging = false;
-      try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
-    }
-    handle.addEventListener('pointerup', endDrag);
-    handle.addEventListener('pointercancel', endDrag);
+    slider.oninput = function() { commitPct(parseInt(this.value) || 5, true); };
   }
 
   // ── Reward actions ────────────────────────────────────────────────────────
@@ -1561,7 +1687,11 @@
     var name = base;
     var n = 1;
     while (cfg.rewards[name]) name = base + ' ' + (++n);
-    cfg.rewards[name] = { videos: [], width: 480, height: 270, volume: 0.8, maxDuration: 10000, respectSafeZones: true, playback: 'random' };
+    // Tamaño por defecto: 67% (asumiendo 16:9 hasta que se asigne un video).
+    var cw = (cfg.canvas && cfg.canvas.width) || 1920;
+    var dw = Math.round(cw * 0.67);
+    var dh = Math.round(dw * 9 / 16);
+    cfg.rewards[name] = { videos: [], sizePct: 67, width: dw, height: dh, volume: 0.8, maxDuration: 10000, respectSafeZones: true, playback: 'random', animIn: 'pop', animOut: 'pop' };
     markDirty();
     renderRewardsList();
     selectReward(name);
@@ -1595,18 +1725,36 @@
 
   // ── Safe zones ────────────────────────────────────────────────────────────
 
-  function toggleZoneForm(open) {
+  function toggleZoneForm(open, idx) {
     document.getElementById('zoneForm').className = 'zone-form' + (open ? ' open' : '');
-    if (open) {
-      document.getElementById('zfName').value = '';
-      document.getElementById('zfX').value = '';
-      document.getElementById('zfY').value = '';
-      document.getElementById('zfW').value = '';
-      document.getElementById('zfH').value = '';
+    var saveBtn = document.getElementById('zfSave');
+    if (!open) { editingZone = null; renderZonesList(); return; }
+
+    editingZone = (typeof idx === 'number') ? idx : null;
+    var setVals = function(name, x, y, w, h) {
+      document.getElementById('zfName').value = name;
+      document.getElementById('zfX').value = x;
+      document.getElementById('zfY').value = y;
+      document.getElementById('zfW').value = w;
+      document.getElementById('zfH').value = h;
+    };
+    if (editingZone !== null && cfg.safeZones && cfg.safeZones.exclude[editingZone]) {
+      var z = cfg.safeZones.exclude[editingZone];
+      setVals(z.name || '', z.x || 0, z.y || 0, z.width || 0, z.height || 0);
+      saveBtn.textContent = 'Guardar';
+    } else {
+      // Caja por defecto visible (abajo-derecha, tipo webcam) para arrastrar enseguida.
+      var cw = (cfg.canvas && cfg.canvas.width)  || 1920;
+      var ch = (cfg.canvas && cfg.canvas.height) || 1080;
+      var dw = Math.round(cw * 0.22), dh = Math.round(ch * 0.30);
+      setVals('', Math.max(0, cw - dw - 40), Math.max(0, ch - dh - 40), dw, dh);
+      saveBtn.textContent = 'Agregar';
     }
+    renderZonesList();   // refresca el resaltado de la zona en edición
+    setupZonePreview();
   }
 
-  function addZone() {
+  function saveZone() {
     var name = document.getElementById('zfName').value.trim() || 'zona';
     var x = parseInt(document.getElementById('zfX').value) || 0;
     var y = parseInt(document.getElementById('zfY').value) || 0;
@@ -1614,7 +1762,12 @@
     var h = parseInt(document.getElementById('zfH').value) || 100;
     if (!cfg.safeZones) cfg.safeZones = { exclude: [] };
     if (!cfg.safeZones.exclude) cfg.safeZones.exclude = [];
-    cfg.safeZones.exclude.push({ x: x, y: y, width: w, height: h, name: name });
+    var zone = { x: x, y: y, width: w, height: h, name: name };
+    if (editingZone !== null && cfg.safeZones.exclude[editingZone]) {
+      cfg.safeZones.exclude[editingZone] = zone;
+    } else {
+      cfg.safeZones.exclude.push(zone);
+    }
     markDirty();
     renderZonesList();
     toggleZoneForm(false);
@@ -1622,8 +1775,92 @@
 
   function removeZone(idx) {
     cfg.safeZones.exclude.splice(idx, 1);
+    if (editingZone === idx) toggleZoneForm(false);
     markDirty();
     renderZonesList();
+  }
+
+  // Mini-canvas de la safe zone: caja arrastrable (mover) + esquina (redimensionar),
+  // sincronizada con los inputs X/Y/Ancho/Alto en ambos sentidos.
+  function setupZonePreview() {
+    var preview = document.getElementById('zonePreview');
+    var box     = document.getElementById('zpBox');
+    var handle  = document.getElementById('zpHandle');
+    if (!preview || !box) return;
+
+    var canvasW = (cfg.canvas && cfg.canvas.width)  || 1920;
+    var canvasH = (cfg.canvas && cfg.canvas.height) || 1080;
+    var W = preview.clientWidth || 206;
+    var scale = W / canvasW;
+    preview.style.height = Math.round(canvasH * scale) + 'px';
+
+    // Otras zonas (tenues, de referencia), excluyendo la que se edita.
+    preview.querySelectorAll('.zp-other').forEach(function(e) { e.remove(); });
+    var zones = (cfg.safeZones && cfg.safeZones.exclude) || [];
+    zones.forEach(function(z, i) {
+      if (i === editingZone) return;
+      var el = document.createElement('div');
+      el.className = 'zp-other';
+      el.style.left   = Math.round((z.x || 0) * scale) + 'px';
+      el.style.top    = Math.round((z.y || 0) * scale) + 'px';
+      el.style.width  = Math.round((z.width  || 0) * scale) + 'px';
+      el.style.height = Math.round((z.height || 0) * scale) + 'px';
+      el.title = z.name || 'safe zone';
+      preview.insertBefore(el, box);
+    });
+
+    var inX = document.getElementById('zfX'), inY = document.getElementById('zfY');
+    var inW = document.getElementById('zfW'), inH = document.getElementById('zfH');
+    function val(el, d) { var n = parseInt(el.value); return isNaN(n) ? d : n; }
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function renderBox() {
+      var w = clamp(val(inW, 420), 10, canvasW);
+      var h = clamp(val(inH, 280), 10, canvasH);
+      var x = clamp(val(inX, 0), 0, canvasW - w);
+      var y = clamp(val(inY, 0), 0, canvasH - h);
+      box.style.left   = Math.round(x * scale) + 'px';
+      box.style.top    = Math.round(y * scale) + 'px';
+      box.style.width  = Math.round(w * scale) + 'px';
+      box.style.height = Math.round(h * scale) + 'px';
+    }
+    renderBox();
+    [inX, inY, inW, inH].forEach(function(el) {
+      el.oninput = function() { renderBox(); };
+    });
+
+    var mode = null, sx = 0, sy = 0, ox = 0, oy = 0, ow = 0, oh = 0;
+    box.onpointerdown = function(e) {
+      if (e.target === handle) return;   // la esquina maneja su propio gesto
+      e.preventDefault();
+      mode = 'move'; sx = e.clientX; sy = e.clientY;
+      ox = val(inX, 0); oy = val(inY, 0);
+      try { box.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+    handle.onpointerdown = function(e) {
+      e.preventDefault(); e.stopPropagation();
+      mode = 'resize'; sx = e.clientX; sy = e.clientY;
+      ow = val(inW, 420); oh = val(inH, 280); ox = val(inX, 0); oy = val(inY, 0);
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+    function onMove(e) {
+      if (!mode) return;
+      var dx = (e.clientX - sx) / scale, dy = (e.clientY - sy) / scale;
+      if (mode === 'move') {
+        var w = val(inW, 420), h = val(inH, 280);
+        inX.value = Math.round(clamp(ox + dx, 0, canvasW - w));
+        inY.value = Math.round(clamp(oy + dy, 0, canvasH - h));
+      } else {
+        inW.value = Math.round(clamp(ow + dx, 10, canvasW - ox));
+        inH.value = Math.round(clamp(oh + dy, 10, canvasH - oy));
+      }
+      renderBox();
+    }
+    box.onpointermove = onMove;
+    handle.onpointermove = onMove;
+    function end() { mode = null; }
+    box.onpointerup = end; box.onpointercancel = end;
+    handle.onpointerup = end; handle.onpointercancel = end;
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
