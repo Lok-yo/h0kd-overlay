@@ -797,14 +797,19 @@
     // We handle the open ourselves (stopping the global link handler) and delay
     // it so the horn plays while the app still has focus — opening the browser
     // backgrounds the webview and would otherwise suspend the audio.
+    var ocOpening = false;  // guard: rapid repeated clicks must open the channel only once
     document.getElementById('onbOcLink').addEventListener('click', function(e) {
       e.preventDefault();
       e.stopPropagation();
       try { var horn = new Audio('assets/party-horn.mp3'); horn.volume = 0.35; horn.play(); } catch (_) {}
       var r = this.getBoundingClientRect();
       burstConfetti(r.left + r.width / 2, r.top + r.height / 2);
+      if (ocOpening) return;  // confetti/horn still fire on every click; the tab opens once
+      ocOpening = true;
       var url = this.getAttribute('href');
-      setTimeout(function() { invoke('open_url', { url: url }).catch(function(){}); }, 700);
+      setTimeout(function() {
+        invoke('open_url', { url: url }).catch(function(){}).then(function(){ ocOpening = false; });
+      }, 700);
     });
     try { if (!localStorage.getItem('onboardingSeen')) showOnboarding(); } catch (_) {}
 
@@ -1211,8 +1216,13 @@
     if (twitchRewards.length) {
       var matched = twitchRewards.some(function(r) { return r.title === name; });
       var opts = twitchRewards.map(function(r) {
+        // A Twitch reward is "taken" when another app reward is already linked
+        // to it (i.e. shares its title). Disable it so the user can't link the
+        // same Twitch reward twice — that would collide on the reward name.
+        var taken = r.title !== name && cfg.rewards.hasOwnProperty(r.title);
         return '<option value="' + esc(r.title) + '"' + (r.title === name ? ' selected' : '')
-          + '>' + esc(r.title) + '</option>';
+          + (taken ? ' disabled' : '')
+          + '>' + esc(r.title) + (taken ? ' (ya vinculada)' : '') + '</option>';
       }).join('');
       return '<div class="field">'
         + '<label>Reward de Twitch</label>'
@@ -1570,8 +1580,17 @@
     });
     cfg.rewards = newRewards;
     sel = newName;
+    // Preserve a video the user picked but hasn't added yet: re-rendering the
+    // editor (e.g. when linking the Twitch reward) would otherwise reset the
+    // dropdown, forcing them to choose it again.
+    var pendingVideoEl = document.getElementById('videoSelect');
+    var pendingVideo = pendingVideoEl ? pendingVideoEl.value : '';
     markDirty();
     renderAll();
+    if (pendingVideo) {
+      var restored = document.getElementById('videoSelect');
+      if (restored) restored.value = pendingVideo;
+    }
   }
 
   // ── Safe zones ────────────────────────────────────────────────────────────
