@@ -249,8 +249,10 @@ async fn check_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, Strin
 }
 
 /// Download + install the available update, then relaunch into the new version.
+/// Emits `update://progress` events (0–100) so the UI can show a percentage.
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
     use tauri_plugin_updater::UpdaterExt;
     let updater = app.updater().map_err(|e| e.to_string())?;
     let update = updater
@@ -258,8 +260,34 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "no hay actualización disponible".to_string())?;
+
+    let mut downloaded: u64 = 0;
+    let mut last_pct: i64 = -1;
+    let on_chunk = {
+        let app = app.clone();
+        move |chunk: usize, total: Option<u64>| {
+            downloaded += chunk as u64;
+            // Sin Content-Length no hay porcentaje; el front cae a "Descargando…".
+            if let Some(total) = total.filter(|t| *t > 0) {
+                let pct = ((downloaded * 100) / total).min(100) as i64;
+                // Emit solo cuando cambia el entero, para no inundar el front.
+                if pct != last_pct {
+                    last_pct = pct;
+                    let _ = app.emit("update://progress", pct);
+                }
+            }
+        }
+    };
+    let on_finish = {
+        let app = app.clone();
+        move || {
+            // 100% = descarga lista; ahora corre el instalador.
+            let _ = app.emit("update://progress", 100i64);
+        }
+    };
+
     update
-        .download_and_install(|_chunk, _total| {}, || {})
+        .download_and_install(on_chunk, on_finish)
         .await
         .map_err(|e| e.to_string())?;
     app.restart();

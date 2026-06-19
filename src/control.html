@@ -1895,10 +1895,25 @@
   async function doUpdate() {
     var btn = document.getElementById('updateBtn');
     btn.disabled = true;
-    btn.textContent = 'Actualizando…';
+    btn.textContent = 'Descargando…';
+
+    // Escucha el progreso emitido por el backend (0–100). Sin Content-Length
+    // el evento no llega y el botón se queda en "Descargando…".
+    var unlisten = null;
+    var ev = window.__TAURI__ && window.__TAURI__.event;
+    if (ev && ev.listen) {
+      try {
+        unlisten = await ev.listen('update://progress', function(e) {
+          var pct = e.payload;
+          btn.textContent = pct >= 100 ? 'Instalando…' : 'Descargando… ' + pct + '%';
+        });
+      } catch (_) { /* sin eventos: el texto fijo alcanza */ }
+    }
+
     try {
       await invoke('install_update');   // descarga, instala y reinicia la app
     } catch (e) {
+      if (unlisten) { try { unlisten(); } catch (_) {} }
       btn.disabled = false;
       btn.textContent = 'Actualizar';
       alert('No se pudo actualizar: ' + e);
