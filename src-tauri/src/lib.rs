@@ -13,6 +13,19 @@ pub struct AppState {
     pub data_dir: Arc<PathBuf>,
     pub twitch: twitch::SharedStatus,
     pub twitch_cmd: mpsc::Sender<TwitchCmd>,
+    /// Whether THIS instance's HTTP/WS server bound the port. The only reliable
+    /// signal: an HTTP ping to :3001 can succeed against a *different* process
+    /// (e.g. a stale instance) and falsely look healthy.
+    pub server_health: Arc<Mutex<ServerHealth>>,
+}
+
+/// Reported to the UI so it can warn when the local server didn't start.
+#[derive(Clone, serde::Serialize)]
+#[serde(tag = "state", rename_all = "lowercase")]
+pub enum ServerHealth {
+    Starting,
+    Ok,
+    Error { message: String },
 }
 
 /// Broadcast a `playVideo` event to every connected overlay.
@@ -165,6 +178,11 @@ fn trigger_reward(state: tauri::State<AppState>, reward: String, user: Option<St
     json!({ "ok": true, "clients": clients })
 }
 
+#[tauri::command]
+fn server_status(state: tauri::State<AppState>) -> ServerHealth {
+    state.server_health.lock().map(|h| h.clone()).unwrap_or(ServerHealth::Starting)
+}
+
 // ── Twitch (direct EventSub integration) ─────────────────────────────────────
 
 #[tauri::command]
@@ -308,16 +326,39 @@ pub fn run() {
         data_dir: data_dir.clone(),
         twitch: twitch_shared,
         twitch_cmd,
+        server_health: Arc::new(Mutex::new(ServerHealth::Starting)),
     };
 
     tauri::Builder::default()
+        // Single-instance must be the FIRST plugin. If the app is already
+        // running, the new process exits and we just focus the existing window
+        // instead of launching a duplicate that can't bind the port.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            use tauri::Manager;
+            if let Some(w) = app.get_webview_window("control") {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state.clone())
         .setup(move |_| {
             let server_state = state.clone();
+            let health = server_state.server_health.clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = server::start(server_state).await {
-                    eprintln!("[Server] failed to start: {}", e);
+                    let msg = if e.kind() == std::io::ErrorKind::AddrInUse {
+                        "El puerto 3001 ya está en uso por otra aplicación. \
+                         Cerrá la otra instancia (o el programa que lo ocupa) y reabrí Stream Overlay."
+                            .to_string()
+                    } else {
+                        format!("No se pudo iniciar el servidor local: {}", e)
+                    };
+                    eprintln!("[Server] {}", msg);
+                    if let Ok(mut h) = health.lock() {
+                        *h = ServerHealth::Error { message: msg };
+                    }
                 }
             });
             // Twitch EventSub worker: connects to Twitch and broadcasts redemptions.
@@ -330,6 +371,7 @@ pub fn run() {
             save_config,
             list_videos,
             trigger_reward,
+            server_status,
             open_data_dir,
             open_url,
             twitch_status,

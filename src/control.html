@@ -659,6 +659,12 @@
 </head>
 <body>
 
+<div id="serverErrBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:#5a1212;color:#ffe3e3;font-size:13px;line-height:1.4;padding:10px 16px;
+  border-bottom:1px solid #a33;box-shadow:0 2px 8px rgba(0,0,0,.4);">
+  <b>⚠ Servidor local no disponible.</b> <span id="serverErrMsg"></span>
+</div>
+
 <div class="onb-overlay" id="onboarding">
   <div class="onb-card">
     <div class="onb-oc-wrap">
@@ -900,6 +906,11 @@
     pingServer();
     setInterval(pingServer, 4000);
 
+    // Authoritative health check: did THIS instance bind the port? (An HTTP ping
+    // can succeed against a stale duplicate, so we ask the backend directly.)
+    pollServerHealth();
+    setInterval(pollServerHealth, 4000);
+
     // Twitch status poll
     pollTwitch();
     setInterval(pollTwitch, 2000);
@@ -1051,6 +1062,19 @@
   function setConn(on) {
     var dot = document.getElementById('connDot');
     dot.className = 'conn-dot' + (on ? ' on' : '');
+  }
+
+  async function pollServerHealth() {
+    var st;
+    try { st = await invoke('server_status'); }
+    catch (_) { return; }
+    var banner = document.getElementById('serverErrBanner');
+    if (st && st.state === 'error') {
+      document.getElementById('serverErrMsg').textContent = st.message || '';
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+    }
   }
 
   // ── Dirty tracking ────────────────────────────────────────────────────────

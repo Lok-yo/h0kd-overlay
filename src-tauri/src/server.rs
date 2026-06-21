@@ -19,6 +19,7 @@ static OVERLAY_HTML: &str = include_str!("../../src/overlay.html");
 
 pub async fn start(state: AppState) -> std::io::Result<()> {
     let videos_dir = state.data_dir.join("videos");
+    let health = state.server_health.clone();
 
     let app = Router::new()
         .route("/", get(root_handler))
@@ -30,7 +31,11 @@ pub async fn start(state: AppState) -> std::io::Result<()> {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
+    // `?` propagates AddrInUse to the caller, which records it as ServerHealth::Error.
     let listener = tokio::net::TcpListener::bind(SERVER_BIND).await?;
+    if let Ok(mut h) = health.lock() {
+        *h = crate::ServerHealth::Ok;
+    }
     println!("[Server] Listening on http://{}", SERVER_BIND);
     println!("[Server] Overlay (OBS) → http://{}/overlay", SERVER_BIND);
 
