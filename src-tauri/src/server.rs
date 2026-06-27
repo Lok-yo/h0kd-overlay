@@ -81,27 +81,44 @@ async fn handle_ws(socket: WebSocket, tx: tokio::sync::broadcast::Sender<String>
     let _ = sink.send(Message::Text(hello)).await;
     println!("[WS] Overlay conectado. Total: {}", tx.receiver_count());
 
-    // Reader: drain incoming messages (overlay doesn't send anything meaningful)
-    let read = tokio::spawn(async move {
+    // Reader: drain incoming messages and notice when the overlay goes away.
+    // Breaking on Close (or any error) lets us reap the connection promptly so
+    // the receiver count stays accurate for the panel's "overlay connected"
+    // indicator.
+    let mut read = tokio::spawn(async move {
         while let Some(msg) = stream.next().await {
-            if msg.is_err() {
-                break;
+            match msg {
+                Ok(Message::Close(_)) | Err(_) => break,
+                _ => {}
             }
         }
     });
 
-    // Writer: forward broadcast messages
-    let write = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            if sink.send(Message::Text(msg)).await.is_err() {
-                break;
+    // Writer: forward broadcast messages, plus a keepalive ping so a dead
+    // overlay is detected even when no redemptions are flowing (otherwise a
+    // crashed OBS would linger in the count until the next broadcast).
+    let mut write = tokio::spawn(async move {
+        let mut keepalive = tokio::time::interval(std::time::Duration::from_secs(10));
+        keepalive.tick().await; // first tick fires immediately — skip it
+        loop {
+            tokio::select! {
+                msg = rx.recv() => match msg {
+                    Ok(m) => if sink.send(Message::Text(m)).await.is_err() { break; },
+                    Err(_) => break, // channel closed or lagged
+                },
+                _ = keepalive.tick() => {
+                    if sink.send(Message::Ping(Vec::new())).await.is_err() { break; }
+                }
             }
         }
     });
 
+    // When either half finishes (overlay closed, send failed, ping failed),
+    // abort the other so its `rx` subscription is dropped immediately. Without
+    // this the writer would keep its subscription alive, inflating the count.
     tokio::select! {
-        _ = read => {}
-        _ = write => {}
+        _ = &mut read  => { write.abort(); }
+        _ = &mut write => { read.abort();  }
     }
     println!("[WS] Overlay desconectado. Total: {}", tx.receiver_count().saturating_sub(1));
 }

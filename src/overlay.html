@@ -49,10 +49,42 @@
     @keyframes outSlideDown  { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(50px); } }
     @keyframes outSlideLeft  { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(-50px); } }
     @keyframes outSlideRight { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(50px); } }
+
+    /* ── Setup status badge ──────────────────────────────────────────────────
+       Visible ONLY while configuring (page load → first successful connection).
+       After the overlay connects once it is removed for good, so it can never
+       appear on a live stream during a later reconnect. */
+    #setupStatus {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      color: #efeff1;
+      background: rgba(20, 20, 23, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      transition: opacity 0.5s ease;
+    }
+    #setupStatus .dot {
+      width: 11px; height: 11px; border-radius: 50%;
+      background: #f0a000; box-shadow: 0 0 8px #f0a000;
+    }
+    #setupStatus.connected .dot { background: #00d563; box-shadow: 0 0 8px #00d563; }
+    #setupStatus.connected { border-color: rgba(0, 213, 99, 0.4); }
+    #setupStatus.hidden { opacity: 0; }
   </style>
 </head>
 <body>
   <div id="overlay"></div>
+  <div id="setupStatus"><span class="dot"></span><span id="setupStatusText">Conectando al servidor…</span></div>
 
   <script>
     // ── Constants ────────────────────────────────────────────────────────────
@@ -91,6 +123,29 @@
     };
     let ws = null;
     let wsReconnectTimer = null;
+
+    // ── Setup status badge ────────────────────────────────────────────────────
+    // Shows "Conectando…" from load until the first successful connection, then
+    // flips to "✓ Conectado" and removes itself permanently. It never reappears
+    // on a later reconnect, so it can't show up mid-stream. Disable entirely with
+    // ?silent (or ?nostatus) in the OBS Browser Source URL.
+    const setupBadge = (() => {
+      const el = document.getElementById('setupStatus');
+      const q  = new URLSearchParams(location.search);
+      const disabled = q.has('silent') || q.has('nostatus');
+      let done = false;
+      if (disabled && el) el.remove();
+      return {
+        connected() {
+          if (done || disabled || !el) return;
+          done = true;
+          el.classList.add('connected');
+          document.getElementById('setupStatusText').textContent = '✓ Conectado — ya podés cerrar esto';
+          setTimeout(() => el.classList.add('hidden'), 1500);
+          setTimeout(() => { if (el.parentNode) el.remove(); }, 2100);
+        }
+      };
+    })();
 
     // ── Logging ──────────────────────────────────────────────────────────────
     const log   = (...a) => console.log('[Overlay]', ...a);
@@ -252,6 +307,7 @@
       ws.onopen = () => {
         logWS('Connected to admin server');
         clearTimeout(wsReconnectTimer);
+        setupBadge.connected();
       };
 
       ws.onmessage = (ev) => {
