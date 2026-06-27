@@ -183,6 +183,17 @@ fn server_status(state: tauri::State<AppState>) -> ServerHealth {
     state.server_health.lock().map(|h| h.clone()).unwrap_or(ServerHealth::Starting)
 }
 
+/// How many overlays (OBS Browser Sources) are currently connected via WS.
+/// Every `handle_ws` subscribes to the broadcast channel, so the receiver count
+/// equals the number of live overlay connections. The control panel polls this
+/// to show a persistent "overlay connected" indicator so the streamer can
+/// confirm OBS is hooked up *before* going live, instead of finding out on a
+/// real redemption.
+#[tauri::command]
+fn overlay_count(state: tauri::State<AppState>) -> usize {
+    state.tx.receiver_count()
+}
+
 // ── Twitch (direct EventSub integration) ─────────────────────────────────────
 
 #[tauri::command]
@@ -372,6 +383,7 @@ pub fn run() {
             list_videos,
             trigger_reward,
             server_status,
+            overlay_count,
             open_data_dir,
             open_url,
             twitch_status,

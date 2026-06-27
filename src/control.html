@@ -509,6 +509,9 @@
   footer code:hover { background: var(--border); }
   .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
   .conn-dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #overlayStatus { display: inline-flex; align-items: center; gap: 6px; }
+  #overlayStatus.warn #overlayStatusText { color: #f0a000; }
+  #overlayStatus.on   #overlayStatusText { color: var(--green); }
 
   /* ── Twitch panel ── */
   #twBody { display: flex; flex-direction: column; gap: 8px; }
@@ -769,6 +772,11 @@
   <span class="conn-dot" id="connDot"></span>
   <span id="connText">Servidor: <code id="serverUrl" title="Click para copiar">http://localhost:3001</code></span>
   <span style="flex:1"></span>
+  <span id="overlayStatus" title="¿OBS está mostrando el overlay?">
+    <span class="conn-dot" id="overlayDot"></span>
+    <span id="overlayStatusText">Buscando overlay…</span>
+  </span>
+  <span style="opacity:.4">|</span>
   <span>OBS Browser Source: <code id="overlayUrl" title="Click para copiar">http://localhost:3001/overlay</code></span>
 </footer>
 
@@ -914,6 +922,11 @@
     // can succeed against a stale duplicate, so we ask the backend directly.)
     pollServerHealth();
     setInterval(pollServerHealth, 4000);
+
+    // Is an overlay (OBS Browser Source) actually connected? Lets the streamer
+    // confirm the setup works before going live, instead of on a real redemption.
+    pollOverlay();
+    setInterval(pollOverlay, 3000);
 
     // Twitch status poll
     pollTwitch();
@@ -1097,6 +1110,30 @@
   function setConn(on) {
     var dot = document.getElementById('connDot');
     dot.className = 'conn-dot' + (on ? ' on' : '');
+  }
+
+  // Poll how many overlays are connected and reflect it in the footer, with an
+  // actionable hint when none is hooked up. `overlay_count` returns the live WS
+  // subscriber count from the backend (one per OBS Browser Source).
+  async function pollOverlay() {
+    var n;
+    try { n = await invoke('overlay_count'); }
+    catch (_) { return; }   // server not up yet; the red banner already covers that
+    var wrap = document.getElementById('overlayStatus');
+    var dot  = document.getElementById('overlayDot');
+    var text = document.getElementById('overlayStatusText');
+    if (n > 0) {
+      wrap.className = 'on';
+      wrap.title = 'OBS está mostrando el overlay (' + n + ' conectado' + (n !== 1 ? 's' : '') + ').';
+      dot.className = 'conn-dot on';
+      text.textContent = n > 1 ? ('Overlay conectado (' + n + ')') : 'Overlay conectado';
+    } else {
+      wrap.className = 'warn';
+      wrap.title = 'Ningún overlay conectado. En OBS: clic derecho en el Browser Source → Actualizar, '
+        + 'y verificá que la URL sea http://localhost:3001/overlay';
+      dot.className = 'conn-dot warn';
+      text.textContent = 'Sin overlay — revisá OBS';
+    }
   }
 
   async function pollServerHealth() {
