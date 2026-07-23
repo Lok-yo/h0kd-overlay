@@ -30,6 +30,36 @@ App de escritorio self-hosted, sin servicios externos y sin límite de videos.
 
 ## ⬇️ Descargar e instalar
 
+### CachyOS / Arch Linux
+
+Este repositorio incluye un `PKGBUILD` para compilar e instalar la aplicación como paquete
+nativo administrado por `pacman`.
+
+```bash
+sudo pacman -S --needed base-devel
+git clone https://github.com/h0kd/h0kd-overlay.git
+cd h0kd-overlay
+makepkg -si
+```
+
+Después podés abrir **Stream Overlay** desde el menú de aplicaciones o ejecutar:
+
+```bash
+stream-overlay
+```
+
+Para instalar el paquete generado en otra computadora CachyOS/Arch, copiá el archivo
+`h0kd-overlay-0.2.9-1-x86_64.pkg.tar.zst` y ejecutá:
+
+```bash
+sudo pacman -U h0kd-overlay-0.2.9-1-x86_64.pkg.tar.zst
+```
+
+> El paquete es específico para sistemas Arch Linux de 64 bits. No es un paquete
+> universal para otras distribuciones.
+
+### Windows
+
 1. Bajá el instalador desde **[la última Release](https://github.com/h0kd/h0kd-overlay/releases/latest)** (`.exe` o `.msi`).
 2. Ejecutalo.
 
@@ -95,7 +125,7 @@ y *"Refresh browser when scene becomes active"*, y poné el source encima de tod
 <details>
 <summary>Compilar desde el código</summary>
 
-Multiplataforma (Windows y macOS). Requiere [Rust](https://rustup.rs) y el Tauri CLI:
+Multiplataforma (Windows, macOS y Linux). Requiere [Rust](https://rustup.rs) y el Tauri CLI:
 
 ```bash
 cargo install tauri-cli --version "^2"
@@ -103,6 +133,8 @@ cargo install tauri-cli --version "^2"
 
 - **Windows:** Microsoft C++ Build Tools + WebView2 (viene con Windows 10/11).
 - **macOS:** Xcode Command Line Tools (`xcode-select --install`).
+- **CachyOS/Arch:** usá `makepkg -si` desde la raíz para instalar las dependencias
+  declaradas y generar el paquete nativo.
 
 ```bash
 cd src-tauri
