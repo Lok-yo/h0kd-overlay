@@ -30,6 +30,19 @@ App de escritorio self-hosted, sin servicios externos y sin límite de videos.
 
 ## ⬇️ Descargar e instalar
 
+### Windows
+
+1. Bajá el instalador desde **[la última Release](https://github.com/h0kd/h0kd-overlay/releases/latest)** (`.exe` o `.msi`).
+2. Ejecutalo.
+
+   > **Nota:** la primera vez, Windows SmartScreen puede avisar que la app no es reconocida
+   > (todavía no está firmada digitalmente). Hacé clic en **Más info → Ejecutar de todas formas**.
+
+3. Abrí **Stream Overlay**. La primera vez te muestra una guía rápida de 3 pasos.
+
+> Tu configuración y videos quedan en una carpeta tuya
+> (`%APPDATA%\Stream Overlay`). El botón **Carpeta** de la app la abre.
+
 ### Arch Linux
 
 1. Descargá `h0kd-overlay-0.2.9-2-x86_64.pkg.tar.zst` desde la
@@ -44,19 +57,6 @@ sudo pacman -U ./h0kd-overlay-0.2.9-2-x86_64.pkg.tar.zst
 
 > Compatible con Arch Linux x86_64 actualizado. También puede funcionar en
 > distribuciones basadas en Arch que mantengan dependencias compatibles, como CachyOS.
-
-### Windows
-
-1. Bajá el instalador desde **[la última Release](https://github.com/h0kd/h0kd-overlay/releases/latest)** (`.exe` o `.msi`).
-2. Ejecutalo.
-
-   > **Nota:** la primera vez, Windows SmartScreen puede avisar que la app no es reconocida
-   > (todavía no está firmada digitalmente). Hacé clic en **Más info → Ejecutar de todas formas**.
-
-3. Abrí **Stream Overlay**. La primera vez te muestra una guía rápida de 3 pasos.
-
-> Tu configuración y videos quedan en una carpeta tuya
-> (`%APPDATA%\Stream Overlay`). El botón **Carpeta** de la app la abre.
 
 ---
 
