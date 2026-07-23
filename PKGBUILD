@@ -1,6 +1,6 @@
 pkgname=h0kd-overlay
 pkgver=0.2.9
-pkgrel=1
+pkgrel=2
 pkgdesc='Self-hosted Twitch Channel Points video overlay'
 arch=('x86_64')
 url='https://github.com/h0kd/h0kd-overlay'
@@ -31,9 +31,13 @@ build() {
   cd "$pkgname-$pkgver/src-tauri"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR=target
+  export CFLAGS="-march=x86-64 -mtune=generic -O2 -pipe"
+  export CXXFLAGS="$CFLAGS"
   # Rust 1.97 LTO drops ring's native archive while linking this local library.
   export CARGO_PROFILE_RELEASE_LTO=false
-  export RUSTFLAGS="${RUSTFLAGS:-} -C linker-features=-lld"
+  # Use the x86-64 baseline instead of CachyOS target-cpu=native so the package
+  # remains portable across 64-bit Arch Linux systems.
+  export RUSTFLAGS="-C target-cpu=x86-64 -C linker-features=-lld"
   cargo build --frozen --release --bins --features tauri/custom-protocol
 }
 
@@ -41,7 +45,9 @@ check() {
   cd "$pkgname-$pkgver/src-tauri"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR=target
-  export RUSTFLAGS="${RUSTFLAGS:-} -C linker-features=-lld"
+  export CFLAGS="-march=x86-64 -mtune=generic -O2 -pipe"
+  export CXXFLAGS="$CFLAGS"
+  export RUSTFLAGS="-C target-cpu=x86-64 -C linker-features=-lld"
   cargo test --frozen --features tauri/custom-protocol
 }
 
