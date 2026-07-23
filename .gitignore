@@ -11,6 +11,12 @@ src-tauri/gen/
 # Cargo.lock is committed (this is an application, not a library) for
 # reproducible builds in CI and across machines.
 
+# Arch / CachyOS package artifacts
+/src/
+/pkg/
+/*.pkg.tar.*
+/h0kd-overlay-*.tar.gz
+
 # Build logs
 *.log
 
@@ -24,3 +30,4 @@ twitch.json
 /CLAUDE.md
 /PLANNING.md
 /config.json
+/.codegraph/
