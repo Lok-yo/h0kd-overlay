@@ -49,10 +49,10 @@ stream-overlay
 ```
 
 Para instalar el paquete generado en otra computadora CachyOS/Arch, copiá el archivo
-`h0kd-overlay-0.2.9-1-x86_64.pkg.tar.zst` y ejecutá:
+`h0kd-overlay-0.2.9-2-x86_64.pkg.tar.zst` y ejecutá:
 
 ```bash
-sudo pacman -U h0kd-overlay-0.2.9-1-x86_64.pkg.tar.zst
+sudo pacman -U ./h0kd-overlay-0.2.9-2-x86_64.pkg.tar.zst
 ```
 
 > El paquete es específico para sistemas Arch Linux de 64 bits. No es un paquete
